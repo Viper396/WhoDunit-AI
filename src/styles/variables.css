@@ -1,0 +1,23 @@
+:root {
+  --bg-deep: #05060b;
+  --bg-surface: #0a0c16;
+  --bg-card: #121424;
+  --bg-card-hover: #181b30;
+  --border: #22253d;
+  --border-gold: rgba(200, 168, 75, 0.38);
+  --accent: #c8a84b;
+  --accent-glow: rgba(200, 168, 75, 0.45);
+  --danger: #e05252;
+  --danger-glow: rgba(224, 82, 82, 0.4);
+  --success: #4caf82;
+  --success-glow: rgba(76, 175, 130, 0.4);
+  --text: #f0f0fa;
+  --text-muted: #8c90a6;
+  --c0: #b06ecf;
+  --c1: #3db9c0;
+  --c2: #d4a030;
+  --c3: #d04545;
+  --font-main: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --r: 10px;
+}

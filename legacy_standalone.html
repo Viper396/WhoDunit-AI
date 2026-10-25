@@ -1,0 +1,2660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whodunit AI – The AI Detective Game</title>
+<meta name="description" content="A generative-AI murder mystery detective game. Interrogate suspects, inspect procedural crime scenes, and deduce the killer.">
+<style>
+/* ═══════════════════════════════════════════════════
+   RESET & THEME DESIGN TOKENS
+═══════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-deep:#05050a;
+  --bg-surface:#0b0c16;
+  --bg-card:#121424;
+  --bg-card-hover:#191b32;
+  --border:#22253d;
+  --border-gold:rgba(200,168,75,0.35);
+  --accent:#c8a84b;
+  --accent-glow:rgba(200,168,75,0.45);
+  --danger:#e05252;
+  --danger-glow:rgba(224,82,82,0.4);
+  --success:#4caf82;
+  --success-glow:rgba(76,175,130,0.4);
+  --text:#f0f0fa;
+  --text-muted:#888da8;
+  --c0:#b06ecf;--c1:#3db9c0;--c2:#d4a030;--c3:#d04545;
+  --font-main:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-serif:Georgia,"Times New Roman",serif;
+  --r:10px;
+}
+
+html,body{
+  width:100%;height:100%;
+  background:var(--bg-deep);
+  color:var(--text);
+  font-family:var(--font-main);
+  overflow:hidden;
+  user-select:none;
+}
+
+/* Background atmospheric ambient gradient */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:radial-gradient(ellipse at 50% 10%, #15182e 0%, #090a14 60%, #030307 100%);
+  z-index:-1;pointer-events:none;
+}
+
+/* Common interactive controls */
+.hidden{display:none!important}
+.muted{color:var(--text-muted);font-size:.82rem}
+
+button{
+  cursor:pointer;border:none;border-radius:var(--r);
+  font-family:var(--font-main);font-size:.9rem;font-weight:700;
+  padding:.55rem 1.15rem;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  transition:all .18s cubic-bezier(.2,.8,.2,1);outline:none;
+}
+button:hover:not(:disabled){filter:brightness(1.18);transform:translateY(-1px)}
+button:active:not(:disabled){transform:scale(.97)}
+button:disabled{opacity:.4;cursor:not-allowed;filter:none}
+
+.btn-gold{
+  background:linear-gradient(135deg,#d4a843 0%,#9e7323 100%);
+  color:#0c0903;font-weight:800;letter-spacing:.02em;
+  box-shadow:0 4px 18px rgba(200,168,75,.3);border:1px solid rgba(255,225,130,.4);
+}
+.btn-gold:hover:not(:disabled){box-shadow:0 6px 24px rgba(200,168,75,.5)}
+
+.btn-danger{
+  background:linear-gradient(135deg,#e05252 0%,#a82424 100%);
+  color:#fff;box-shadow:0 4px 16px rgba(224,82,82,.3);border:1px solid rgba(255,120,120,.3);
+}
+
+.btn-ghost{
+  background:rgba(255,255,255,.05);color:var(--text);
+  border:1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled){background:rgba(255,255,255,.1);border-color:var(--border-gold)}
+
+input[type="text"],input[type="password"],textarea{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);
+  color:var(--text);font-family:var(--font-main);font-size:.92rem;padding:.6rem .9rem;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+}
+input:focus,textarea:focus{
+  border-color:var(--accent);box-shadow:0 0 12px rgba(200,168,75,.25);
+}
+
+/* Flash and Static Overlays */
+#screen-flash{
+  position:fixed;inset:0;background:#fff;pointer-events:none;
+  z-index:9999;opacity:0;transition:opacity .15s ease;
+}
+
+#static-overlay{
+  position:absolute;inset:0;pointer-events:none;z-index:60;opacity:0;
+  background:repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.18) 0, rgba(0,0,0,.35) 2px, transparent 3px);
+  background-size:6px 6px;mix-blend-mode:overlay;transition:opacity .25s ease;
+}
+#static-overlay.active{opacity:.85;animation:staticGlitch .15s steps(3) infinite}
+@keyframes staticGlitch{
+  0%{background-position:0 0}50%{background-position:3px 2px}100%{background-position:-2px 4px}
+}
+
+/* ═══════════════════════════════════════════════════
+   START SCREEN
+═══════════════════════════════════════════════════ */
+#start-screen{
+  width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:1.5rem;overflow-y:auto;
+}
+.start-container{
+  max-width:540px;width:100%;display:flex;flex-direction:column;align-items:center;gap:1.2rem;text-align:center;
+}
+.start-badge{
+  font-size:3.6rem;filter:drop-shadow(0 0 25px rgba(200,168,75,.5));
+  animation:floatBadge 3.2s ease-in-out infinite;
+}
+@keyframes floatBadge{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+#start-screen h1{
+  font-size:clamp(2.4rem,6vw,3.6rem);font-weight:900;letter-spacing:.04em;
+  color:var(--accent);text-shadow:0 0 35px rgba(200,168,75,.4);line-height:1.1;
+}
+.start-tagline{
+  color:var(--text-muted);font-size:1.02rem;line-height:1.5;max-width:480px;
+}
+
+.start-card{
+  background:rgba(18,20,36,.88);backdrop-filter:blur(16px);
+  border:1px solid rgba(200,168,75,.3);border-radius:18px;
+  padding:2rem 2.2rem;display:flex;flex-direction:column;gap:1rem;width:100%;
+  box-shadow:0 24px 70px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.05);
+}
+.start-card label{
+  font-size:.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;text-align:left;
+}
+
+.quick-themes{
+  display:flex;flex-wrap:wrap;gap:.4rem;margin-top:-.3rem;margin-bottom:.2rem;
+}
+.theme-pill{
+  font-size:.74rem;background:rgba(255,255,255,.05);border:1px solid var(--border);
+  padding:.25rem .6rem;border-radius:14px;color:var(--text-muted);cursor:pointer;
+  transition:all .15s;
+}
+.theme-pill:hover{color:var(--accent);border-color:var(--accent);background:rgba(200,168,75,.1)}
+
+#start-error{color:var(--danger);font-size:.84rem;min-height:1.2rem;text-align:center}
+
+#ollama-chip{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  font-size:.78rem;border-radius:20px;padding:.32rem .9rem;border:1px solid;font-weight:600;
+}
+#ollama-chip.ready{color:#4caf82;border-color:rgba(76,175,130,.4);background:rgba(76,175,130,.1)}
+#ollama-chip.warn{color:#d4a030;border-color:rgba(212,160,48,.4);background:rgba(212,160,48,.1)}
+#ollama-chip.off{color:var(--text-muted);border-color:var(--border);background:transparent}
+
+/* ═══════════════════════════════════════════════════
+   FULLSCREEN GAME SCREEN & HUD
+═══════════════════════════════════════════════════ */
+#game-screen{
+  width:100vw;height:100vh;max-width:100vw;max-height:100vh;
+  padding:.55rem .85rem;box-sizing:border-box;
+  display:flex;flex-direction:column;gap:.5rem;overflow:hidden;
+}
+
+/* TOP HUD */
+#top-hud{
+  background:rgba(14,16,28,.88);backdrop-filter:blur(16px);
+  border:1px solid rgba(200,168,75,.25);border-radius:12px;
+  padding:.55rem 1.1rem;display:flex;align-items:center;justify-content:space-between;
+  gap:1rem;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+#hud-case-info{display:flex;flex-direction:column;gap:.1rem;min-width:0;flex:1}
+#hud-case-title{
+  color:var(--accent);font-size:1.18rem;font-weight:900;letter-spacing:.02em;
+  display:flex;align-items:center;gap:.5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#hud-case-meta{
+  color:var(--text-muted);font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+#hud-controls{display:flex;align-items:center;gap:1.1rem;flex-shrink:0}
+
+/* Questions Remaining tracker in HUD */
+#q-hud-wrap{display:flex;align-items:center;gap:.6rem;background:rgba(0,0,0,.35);padding:.35rem .75rem;border-radius:8px;border:1px solid rgba(255,255,255,.06)}
+#q-hud-label{font-size:.74rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+#q-hud-icons{display:flex;gap:4px}
+.q-icon{
+  font-size:1.15rem;transition:all .25s cubic-bezier(.2,.8,.2,1);
+  filter:drop-shadow(0 0 5px rgba(200,168,75,.6));display:inline-block;
+}
+.q-icon.used{
+  opacity:.18;filter:grayscale(1);transform:scale(.8);
+}
+
+#hud-provider-tag{
+  font-size:.76rem;color:var(--text-muted);background:rgba(255,255,255,.05);
+  border:1px solid var(--border);border-radius:6px;padding:.3rem .65rem;font-weight:600;
+}
+#sound-toggle{
+  background:rgba(255,255,255,.06);border:1px solid var(--border);
+  padding:.35rem .8rem;font-size:.82rem;border-radius:8px;
+}
+#sound-toggle:hover{border-color:var(--border-gold);color:var(--accent)}
+
+/* Switch Banner */
+#switch-banner{
+  background:#261b02;border:1px solid rgba(212,160,48,.5);border-radius:var(--r);
+  padding:.5rem 1rem;font-size:.82rem;color:#d4a030;display:flex;align-items:center;gap:.6rem;
+  flex-shrink:0;
+}
+
+/* Error Banner */
+#error-banner{
+  background:#2b0b0b;border:1px solid var(--danger);border-radius:var(--r);
+  padding:.55rem 1rem;display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;flex-shrink:0;
+}
+#error-banner span{flex:1;color:#fca5a5;font-size:.86rem}
+#error-banner button{padding:.35rem .85rem;font-size:.8rem}
+
+/* ═══════════════════════════════════════════════════
+   MAIN GAMEPLAY GRID (ZERO NEGATIVE SPACE)
+═══════════════════════════════════════════════════ */
+#game-layout{
+  display:grid;grid-template-columns:minmax(0, 1fr) 390px;gap:.65rem;
+  flex:1;min-height:0;overflow:hidden;
+}
+
+/* LEFT COLUMN: STAGE + INTEGRATED DIALOGUE */
+#stage-col{
+  display:flex;flex-direction:column;gap:.5rem;height:100%;min-height:0;overflow:hidden;
+}
+
+/* 16:9 STAGE WRAPPER */
+#stage-wrap{
+  flex:1;min-height:0;position:relative;width:100%;
+  background:#020205;border:2px solid rgba(200,168,75,.28);border-radius:14px;
+  overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.75), inset 0 0 25px rgba(0,0,0,.6);
+  user-select:none;display:flex;align-items:center;justify-content:center;
+}
+#stage-svg{width:100%;height:100%;display:block}
+
+/* Stage Overlays */
+#stage-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:20}
+#lightning-flash{position:absolute;inset:0;background:#fff;pointer-events:none;opacity:0;z-index:25;transition:opacity .08s ease}
+#stage-vignette{
+  position:absolute;inset:0;pointer-events:none;z-index:24;opacity:0;
+  background:radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(180,0,0,.6) 95%);
+  transition:opacity .5s ease;
+}
+
+/* Suspect Slots & Avatars */
+.suspect-slot{cursor:pointer;transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .3s}
+.suspect-slot:hover{filter:drop-shadow(0 0 14px rgba(255,255,255,.35))}
+.suspect-slot.selected{filter:drop-shadow(0 0 20px var(--slot-color,#c8a84b))}
+.suspect-slot.dimmed{opacity:.48;filter:grayscale(.2) brightness(.85)}
+
+/* Pure Bobbing on Inner Wrap — NEVER resets parent slot transform */
+.avatar-bob-wrap.bob-0{animation:charBob 3.4s ease-in-out infinite}
+.avatar-bob-wrap.bob-1{animation:charBob 3.1s ease-in-out infinite .4s}
+.avatar-bob-wrap.bob-2{animation:charBob 3.6s ease-in-out infinite .8s}
+.avatar-bob-wrap.bob-3{animation:charBob 3.2s ease-in-out infinite 1.2s}
+.avatar-bob-wrap.bob-det{animation:charBob 4s ease-in-out infinite .2s}
+
+@keyframes charBob{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-6px)}
+}
+
+/* Subtle window flicker in scene */
+@keyframes winFlicker{
+  0%,100%{opacity:.92}40%{opacity:.72}42%{opacity:.98}70%{opacity:.82}72%{opacity:.68}
+}
+.flicker{animation:winFlicker 4s ease-in-out infinite alternate}
+
+/* Ground mist slow movement */
+@keyframes mistMove{
+  0%{transform:translateX(-30px)}100%{transform:translateX(30px)}
+}
+.mist-anim{animation:mistMove 14s ease-in-out infinite alternate}
+
+/* ═══════════════════════════════════════════════════
+   VISUAL NOVEL DIALOGUE CONSOLE (INTEGRATED)
+═══════════════════════════════════════════════════ */
+#dialogue-console{
+  background:rgba(16,18,32,.95);border:1px solid rgba(200,168,75,.25);border-radius:12px;
+  padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem;flex-shrink:0;
+  box-shadow:0 8px 30px rgba(0,0,0,.6);position:relative;
+}
+
+#dialogue-meta-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;
+}
+#dialogue-speaker-wrap{display:flex;align-items:center;gap:.5rem}
+#dialogue-speaker-badge{
+  font-size:.86rem;font-weight:900;letter-spacing:.03em;
+  padding:.22rem .8rem;border-radius:6px;background:rgba(255,255,255,.07);
+  color:var(--accent);border:1px solid currentColor;display:inline-flex;align-items:center;gap:.4rem;
+}
+#dialogue-mood-tag{
+  font-size:.74rem;background:rgba(0,0,0,.35);padding:.2rem .6rem;border-radius:12px;
+  border:1px solid var(--border);color:var(--text-muted);font-weight:600;
+}
+#dialogue-skip-hint{font-size:.74rem;color:var(--text-muted);opacity:.75;cursor:pointer}
+#dialogue-skip-hint:hover{color:var(--accent);opacity:1}
+
+#dialogue-text-box{
+  font-size:1.02rem;line-height:1.55;color:#f0f2ff;min-height:2.8rem;word-break:break-word;
+  cursor:pointer;position:relative;
+}
+#dialogue-text-box::after{
+  content:'▍';color:var(--accent);font-weight:900;display:inline-block;
+  animation:cursorBlink .9s infinite alternate;margin-left:3px;
+}
+@keyframes cursorBlink{from{opacity:1}to{opacity:0}}
+
+/* Interrogation Command Input Bar */
+#interrogate-command-bar{
+  display:flex;gap:.55rem;align-items:center;
+}
+#question-input{
+  flex:1;min-height:2.6rem;padding:.55rem .9rem;border-radius:8px;font-size:.92rem;
+}
+#ask-btn{
+  background:linear-gradient(135deg,#7a5af8 0%,#5236d6 100%);color:#fff;
+  white-space:nowrap;padding:.65rem 1.3rem;font-weight:800;
+  box-shadow:0 3px 14px rgba(122,90,248,.35);border:1px solid rgba(255,255,255,.15);
+}
+#ask-btn:hover:not(:disabled){box-shadow:0 4px 20px rgba(122,90,248,.5)}
+
+#accuse-trigger-btn{
+  background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);color:#fff;
+  white-space:nowrap;padding:.65rem 1.15rem;font-weight:800;
+  box-shadow:0 3px 14px rgba(192,57,43,.35);border:1px solid rgba(255,255,255,.15);
+}
+#accuse-trigger-btn:hover:not(:disabled){box-shadow:0 4px 20px rgba(192,57,43,.55)}
+
+/* Quick question chips */
+#quick-questions{
+  display:flex;gap:.4rem;flex-wrap:wrap;margin-top:-.15rem;
+}
+.qq-chip{
+  font-size:.73rem;background:rgba(255,255,255,.05);border:1px solid var(--border);
+  padding:.22rem .55rem;border-radius:12px;color:var(--text-muted);cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.qq-chip:hover{color:var(--accent);border-color:var(--accent);background:rgba(200,168,75,.1)}
+
+#inline-msg{font-size:.76rem;color:#f87171;min-height:.95rem;padding-left:.2rem}
+
+/* ═══════════════════════════════════════════════════
+   RIGHT COLUMN: DETECTIVE EVIDENCE DOCKET
+═══════════════════════════════════════════════════ */
+#evidence-col{
+  background:rgba(18,20,34,.85);backdrop-filter:blur(14px);
+  border:1px solid rgba(200,168,75,.28);border-radius:14px;padding:.85rem;
+  display:flex;flex-direction:column;gap:.65rem;height:100%;min-height:0;overflow:hidden;
+  box-shadow:0 8px 30px rgba(0,0,0,.6);
+}
+
+#evidence-header-wrap{
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);padding-bottom:.45rem;flex-shrink:0;
+}
+#evidence-header-title{
+  color:var(--accent);font-size:.86rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;
+  display:flex;align-items:center;gap:.45rem;
+}
+#ev-count-badge{
+  font-size:.74rem;background:rgba(200,168,75,.12);color:var(--accent);
+  border:1px solid rgba(200,168,75,.35);padding:.15rem .55rem;border-radius:10px;font-weight:800;
+}
+
+/* Filter pills */
+#evidence-filters{
+  display:flex;gap:.35rem;overflow-x:auto;padding-bottom:.2rem;flex-shrink:0;
+}
+.ev-filter-btn{
+  font-size:.72rem;background:transparent;border:1px solid var(--border);
+  color:var(--text-muted);padding:.2rem .55rem;border-radius:12px;cursor:pointer;white-space:nowrap;
+}
+.ev-filter-btn.active{
+  background:var(--accent);color:#0c0903;border-color:var(--accent);font-weight:800;
+}
+
+/* Evidence Cards List */
+#evidence-list{
+  flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:.6rem;padding-right:4px;
+}
+.ev-card{
+  background:#f8f4df;color:#18150c;border-radius:6px;padding:.6rem .75rem;
+  font-size:.8rem;line-height:1.45;position:relative;box-shadow:2px 3px 10px rgba(0,0,0,.45);
+  font-family:var(--font-serif);transition:transform .2s;border-left:4px solid var(--accent);
+}
+.ev-card:hover{transform:scale(1.02)}
+.ev-card-pin{position:absolute;top:-8px;right:12px;font-size:12px}
+.ev-card-author{
+  font-family:var(--font-main);font-weight:900;font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:.25rem;display:flex;align-items:center;justify-content:space-between;
+}
+.ev-card-q{
+  color:#4a3915;font-style:italic;margin-bottom:.3rem;border-bottom:1px dotted rgba(0,0,0,.15);
+  padding-bottom:.25rem;font-size:.78rem;
+}
+.ev-card-a{color:#1a1409}
+
+/* Empty state */
+#evidence-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;text-align:center;color:var(--text-muted);font-size:.84rem;gap:.5rem;padding:1.5rem;
+}
+
+/* Quick Suspect Roster at Bottom of Evidence Panel */
+#quick-roster{
+  border-top:1px solid var(--border);padding-top:.55rem;flex-shrink:0;
+  display:flex;flex-direction:column;gap:.35rem;
+}
+#roster-label{font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em}
+#roster-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.35rem}
+.roster-card{
+  background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;
+  padding:.35rem .25rem;display:flex;flex-direction:column;align-items:center;gap:.25rem;
+  cursor:pointer;transition:all .18s;text-align:center;
+}
+.roster-card:hover{background:rgba(255,255,255,.08);border-color:var(--accent)}
+.roster-card.active{border-color:var(--accent);background:rgba(200,168,75,.12);box-shadow:0 0 10px rgba(200,168,75,.2)}
+.roster-thumb{width:28px;height:35px}
+.roster-name{font-size:.66rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+
+/* ═══════════════════════════════════════════════════
+   CASE INTRO DOSSIER MODAL
+═══════════════════════════════════════════════════ */
+.modal-layer{
+  position:fixed;inset:0;background:rgba(0,0,0,.86);backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;z-index:900;padding:1rem;
+}
+#dossier-card{
+  background:#ded2b4;color:#241d13;border:3px solid #b5a078;border-radius:8px;
+  padding:2rem 2.4rem;max-width:580px;width:100%;box-shadow:0 25px 80px rgba(0,0,0,.95);
+  position:relative;font-family:var(--font-serif);display:flex;flex-direction:column;gap:1.1rem;
+}
+#dossier-stamp{
+  position:absolute;top:16px;right:22px;border:3px solid #b52a2a;color:#b52a2a;
+  font-family:var(--font-main);font-weight:900;font-size:1.05rem;letter-spacing:.12em;padding:.3rem .8rem;
+  transform:rotate(12deg);text-transform:uppercase;opacity:.9;box-shadow:0 0 15px rgba(181,42,42,.3);
+}
+#dossier-title{
+  font-size:1.55rem;color:#18120a;font-weight:900;border-bottom:2px solid #332615;padding-bottom:.4rem;
+}
+#dossier-summary{font-size:.98rem;line-height:1.65;color:#281f14}
+#dossier-svg{width:100%;height:110px;margin:.2rem 0}
+
+/* ═══════════════════════════════════════════════════
+   ACCUSATION CONFIRMATION MODAL
+═══════════════════════════════════════════════════ */
+#accuse-modal-box{
+  background:#141628;border:2px solid var(--danger);border-radius:18px;
+  padding:2rem 2.2rem;max-width:460px;width:100%;text-align:center;
+  display:flex;flex-direction:column;gap:1.1rem;box-shadow:0 20px 70px rgba(224,82,82,.35);
+}
+#accuse-avatar-preview{width:120px;height:150px;margin:0 auto}
+#accuse-modal-title{font-size:1.45rem;color:#fff;font-weight:900}
+#accuse-modal-desc{color:var(--text-muted);font-size:.9rem;line-height:1.55}
+.modal-btn-row{display:flex;gap:.8rem;justify-content:center}
+
+/* ═══════════════════════════════════════════════════
+   END SCREEN (NOIR BROADSHEET GAZETTE)
+═══════════════════════════════════════════════════ */
+#end-screen{
+  width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:1.5rem;gap:1.3rem;text-align:center;overflow-y:auto;
+}
+#verdict-stamp{
+  font-size:clamp(2rem,6vw,3.6rem);font-weight:900;letter-spacing:.08em;
+  text-transform:uppercase;border:6px solid;padding:.5rem 1.6rem;border-radius:12px;
+  display:inline-block;transform:rotate(-3deg);
+}
+.stamp-win{color:var(--success);border-color:var(--success);box-shadow:0 0 50px rgba(76,175,130,.45)}
+.stamp-lose{color:var(--danger);border-color:var(--danger);box-shadow:0 0 50px rgba(224,82,82,.45)}
+
+#newspaper-card{
+  background:#eae3cb;color:#18140c;border:2px solid #8e7c5d;border-radius:4px;
+  padding:2rem 2.5rem;max-width:660px;width:100%;text-align:left;
+  box-shadow:0 24px 80px rgba(0,0,0,.9);font-family:var(--font-serif);
+}
+#paper-masthead{text-align:center;border-bottom:3px double #332616;padding-bottom:.6rem;margin-bottom:1rem}
+#paper-masthead h2{font-size:2rem;letter-spacing:.08em;font-weight:900;text-transform:uppercase}
+#paper-date{font-size:.8rem;font-style:italic;color:#55442e;margin-top:.2rem}
+#paper-headline{font-size:1.4rem;font-weight:900;margin-bottom:.8rem;line-height:1.35;color:#110e08}
+#paper-culprit-row{
+  display:flex;align-items:center;gap:1.2rem;margin-bottom:1rem;
+  background:rgba(0,0,0,.04);padding:.7rem .9rem;border-radius:4px;
+}
+#paper-culprit-svg{width:80px;height:105px;flex-shrink:0}
+#paper-truth{font-size:.95rem;line-height:1.65;color:#221a0f;margin-bottom:.8rem}
+#paper-epilogue{
+  font-size:.92rem;line-height:1.65;color:#443520;font-style:italic;
+  border-top:1px dashed #7a6548;padding-top:.7rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE LAYOUT
+═══════════════════════════════════════════════════ */
+@media(max-width:960px){
+  html,body{overflow:auto}
+  #game-screen{height:auto;max-height:none;overflow:visible}
+  #game-layout{grid-template-columns:1fr;overflow:visible;height:auto}
+  #stage-wrap{aspect-ratio:16/9;max-height:460px;min-height:280px}
+  #evidence-col{height:480px;max-height:480px}
+}
+@media(max-width:640px){
+  #top-hud{flex-direction:column;align-items:flex-start;gap:.5rem}
+  #hud-controls{width:100%;justify-content:space-between}
+  #interrogate-command-bar{flex-wrap:wrap}
+  #question-input{width:100%}
+}
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2a2d48;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#3a3e62}
+</style>
+</head>
+<body>
+
+<div id="screen-flash"></div>
+
+<!-- ══════════════════════════════════════════════
+     START SCREEN
+══════════════════════════════════════════════ -->
+<section id="start-screen">
+  <div class="start-container">
+    <div class="start-badge">🔍</div>
+    <h1>Whodunit AI</h1>
+    <p class="start-tagline">Step into the noir mystery. Procedurally generated murder cases, animated suspects, and AI-driven interrogations. Interrogate, deduce, and convict.</p>
+
+    <div class="start-card">
+      <label for="api-key-input">Gemini API Key <span class="muted">(Optional if Ollama local AI is running)</span></label>
+      <input type="password" id="api-key-input" placeholder="Paste free key from aistudio.google.com/apikey">
+
+      <label for="theme-input">Case Setting / Theme <span class="muted">(Type or click quick presets)</span></label>
+      <div class="quick-themes">
+        <span class="theme-pill" data-theme="Victorian Manor House">🏰 Victorian Manor</span>
+        <span class="theme-pill" data-theme="Grand Art Deco Hotel">🏨 Grand Hotel</span>
+        <span class="theme-pill" data-theme="Deep Space Station">🚀 Deep Space</span>
+        <span class="theme-pill" data-theme="1920s Underground Jazz Club">🎷 1920s Speakeasy</span>
+        <span class="theme-pill" data-theme="Luxury Atlantic Cruise Ship">🚢 Cruise Liner</span>
+        <span class="theme-pill" data-theme="Gothic Boarding School">🎓 Boarding School</span>
+      </div>
+      <input type="text" id="theme-input" placeholder="e.g. haunted hotel, spaceship, speakeasy">
+
+      <button class="btn-gold" id="new-case-btn">🎲 Generate AI Mystery Case</button>
+
+      <div id="ollama-chip" class="off" title="Ollama local AI status">⬤ Local AI: checking…</div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:.2rem 0">
+
+      <button class="btn-ghost" id="offline-btn">📂 Play Offline Demo (No key or setup required)</button>
+      <div id="start-error"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     GAMEPLAY SCREEN (FULLSCREEN ZERO-NEGATIVE-SPACE)
+══════════════════════════════════════════════ -->
+<section id="game-screen" class="hidden">
+
+  <!-- TOP HUD -->
+  <header id="top-hud">
+    <div id="hud-case-info">
+      <div id="hud-case-title">📁 <span id="case-title-txt">Case Title</span></div>
+      <div id="hud-case-meta"><span id="case-meta-txt">Location & Period</span></div>
+    </div>
+
+    <div id="hud-controls">
+      <div id="q-hud-wrap">
+        <span id="q-hud-label">Questions</span>
+        <div id="q-hud-icons"></div>
+      </div>
+      <div id="hud-provider-tag"><span id="footer-model">—</span></div>
+      <button id="sound-toggle" title="Toggle Sound SFX">🔊 Sound</button>
+    </div>
+  </header>
+
+  <!-- Provider switch info banner -->
+  <div id="switch-banner" class="hidden"><span id="switch-msg"></span></div>
+
+  <!-- Error banner -->
+  <div id="error-banner" class="hidden">
+    <span id="error-msg"></span>
+    <button id="retry-btn" class="btn-danger">↺ Retry</button>
+    <button id="offline-from-error-btn" class="btn-ghost">📂 Offline Demo</button>
+  </div>
+
+  <!-- MAIN GAMEPLAY GRID -->
+  <main id="game-layout">
+
+    <!-- LEFT COLUMN: STAGE + DIALOGUE -->
+    <div id="stage-col">
+
+      <!-- 16:9 STAGE -->
+      <div id="stage-wrap">
+        <svg id="stage-svg" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"></svg>
+        <canvas id="stage-canvas" width="1280" height="720"></canvas>
+        <div id="lightning-flash"></div>
+        <div id="stage-vignette"></div>
+        <div id="static-overlay"></div>
+      </div>
+
+      <!-- INTEGRATED VISUAL NOVEL DIALOGUE CONSOLE -->
+      <div id="dialogue-console">
+        <div id="dialogue-meta-bar">
+          <div id="dialogue-speaker-wrap">
+            <span id="dialogue-speaker-badge">🕵️ Detective</span>
+            <span id="dialogue-mood-tag">Neutral</span>
+          </div>
+          <span id="dialogue-skip-hint" title="Fast-forward text">Click text to skip ▶</span>
+        </div>
+
+        <div id="dialogue-text-box" title="Click to skip typewriter">Select a suspect in the lineup above to begin interrogation.</div>
+
+        <!-- Quick Question Chips -->
+        <div id="quick-questions">
+          <span class="qq-chip">"Where were you at the time of the crime?"</span>
+          <span class="qq-chip">"What is your true relation to the victim?"</span>
+          <span class="qq-chip">"Did you enter the study after dinner?"</span>
+          <span class="qq-chip">"Can anyone confirm your alibi?"</span>
+        </div>
+
+        <!-- Command input row -->
+        <div id="interrogate-command-bar">
+          <input type="text" id="question-input" placeholder="Type your interrogation question… (Enter to submit)">
+          <button id="ask-btn">🔍 Ask Question</button>
+          <button id="accuse-trigger-btn">⚖ Accuse Suspect</button>
+        </div>
+
+        <div id="inline-msg"></div>
+      </div>
+
+    </div><!-- /stage-col -->
+
+    <!-- RIGHT COLUMN: DETECTIVE EVIDENCE DOCKET -->
+    <aside id="evidence-col">
+      <div id="evidence-header-wrap">
+        <div id="evidence-header-title">📌 Case Evidence Docket</div>
+        <span id="ev-count-badge">0 clues</span>
+      </div>
+
+      <!-- Filter tabs -->
+      <div id="evidence-filters">
+        <button class="ev-filter-btn active" data-filter="all">All Clues</button>
+        <button class="ev-filter-btn" data-filter="s1">Suspect 1</button>
+        <button class="ev-filter-btn" data-filter="s2">Suspect 2</button>
+        <button class="ev-filter-btn" data-filter="s3">Suspect 3</button>
+        <button class="ev-filter-btn" data-filter="s4">Suspect 4</button>
+      </div>
+
+      <!-- Scrollable list of cards -->
+      <div id="evidence-list">
+        <div id="evidence-empty">
+          <span style="font-size:2rem;opacity:.5">📁</span>
+          <span>No testimony recorded yet.<br>Select a suspect and ask questions to gather clues.</span>
+        </div>
+      </div>
+
+      <!-- Quick Suspect Roster at Bottom -->
+      <div id="quick-roster">
+        <div id="roster-label">Suspect Lineup Roster</div>
+        <div id="roster-grid"></div>
+      </div>
+    </aside>
+
+  </main>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     CASE DOSSIER MODAL
+══════════════════════════════════════════════ -->
+<div id="dossier-modal" class="modal-layer hidden">
+  <div id="dossier-card">
+    <div id="dossier-stamp">CONFIDENTIAL</div>
+    <div id="dossier-title">Case File</div>
+    <svg id="dossier-svg" viewBox="0 0 480 110">
+      <path d="M240 28 C230 28 222 36 222 46 C222 55 229 62 238 64 L225 98 L210 98 L220 72 L185 70 L195 56 L226 60 L236 48 L244 48 L254 60 L285 56 L295 70 L260 72 L270 98 L255 98 L242 64 C251 62 258 55 258 46 C258 36 250 28 240 28 Z" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="6 4" opacity=".8"/>
+      <polygon points="10,65 470,25 470,42 10,82" fill="#e6c229"/>
+      <text x="240" y="58" fill="#111" font-size="12" font-weight="900" text-anchor="middle" transform="rotate(-5 240 58)" letter-spacing="4">POLICE LINE DO NOT CROSS</text>
+    </svg>
+    <div id="dossier-summary"></div>
+    <button class="btn-gold" id="dossier-close-btn">Inspect Crime Scene & Lineup</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ACCUSATION CONFIRMATION MODAL
+══════════════════════════════════════════════ -->
+<div id="accuse-modal" class="modal-layer hidden">
+  <div id="accuse-modal-box">
+    <div id="accuse-avatar-preview"></div>
+    <div id="accuse-modal-title">Accuse Suspect?</div>
+    <div id="accuse-modal-desc">This is your final verdict. An incorrect accusation allows the true killer to vanish into the shadows forever.</div>
+    <div class="modal-btn-row">
+      <button class="btn-ghost" id="accuse-cancel-btn">Return to Case</button>
+      <button class="btn-danger" id="accuse-confirm-btn">⚖ Deliver Accusation</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     END SCREEN (NOIR BROADSHEET GAZETTE)
+══════════════════════════════════════════════ -->
+<section id="end-screen" class="hidden">
+  <div id="verdict-stamp">CASE CLOSED</div>
+
+  <div id="newspaper-card">
+    <div id="paper-masthead">
+      <h2>The Daily Noir Chronicle</h2>
+      <div id="paper-date">City Final Edition · Special Investigation Report</div>
+    </div>
+    <div id="paper-headline">Headline</div>
+    <div id="paper-culprit-row">
+      <div id="paper-culprit-svg"></div>
+      <div>
+        <div style="font-size:.78rem;font-weight:900;text-transform:uppercase;color:#7a6245;">The Perpetrator</div>
+        <div id="paper-culprit-name" style="font-size:1.1rem;font-weight:900;"></div>
+      </div>
+    </div>
+    <div id="paper-truth"></div>
+    <div id="paper-epilogue"></div>
+  </div>
+
+  <button class="btn-gold" id="play-again-btn">🔄 Investigate Another Case</button>
+</section>
+
+<footer>AI Provider: <span id="footer-model">—</span> &nbsp;|&nbsp; Whodunit AI · Zero-dependency procedural detective game</footer>
+
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════════════════
+   1. CONFIG
+═══════════════════════════════════════════════════ */
+const MODELS       = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash-lite"];
+const API_BASE     = "https://generativelanguage.googleapis.com/v1beta/models";
+const OLLAMA_URL   = "http://localhost:11434";
+const OLLAMA_MODEL = "llama3.2";
+const MAX_Q        = 8;
+const TIMEOUT_GEMINI = 20000;
+const TIMEOUT_OLLAMA = 60000;
+const PROVIDER_COOLDOWN = 30000;
+
+const THEMES = [
+  "Victorian Manor House","Grand Art Deco Hotel","Deep Space Station",
+  "1920s Underground Jazz Club","Luxury Atlantic Cruise Ship","Gothic Boarding School",
+  "Haunted Remote Lighthouse","Museum Gala After Hours","Polar Research Base"
+];
+
+const CHAR_COLORS = ["#b06ecf","#3db9c0","#d4a030","#e05252"];
+
+// FX Configuration Flags
+const FX = {
+  sound: true,
+  particles: true,
+  animations: true
+};
+
+// Honor prefers-reduced-motion
+if(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+  FX.animations = false;
+}
+
+/* ═══════════════════════════════════════════════════
+   2. STATE
+═══════════════════════════════════════════════════ */
+let state = {
+  screen: "start",
+  isOffline: false,
+  caseData: null,
+  selectedId: null,
+  chats: {},       // { suspectId: [{role, text, mood}] }
+  notebook: [],    // [{ id, suspectId, name, color, q, a, mood, turn }]
+  questionsLeft: MAX_Q,
+  lastQ: null,
+  modelIdx: 0,
+  pendingAccuse: null,
+  twAbort: false,
+  mouthTimer: null,
+  suspectMoods: {}, // { s1: 'neutral', ... }
+  evidenceFilter: "all",
+  // Provider chain tracking
+  ollamaAvail: false,
+  ollamaHasModel: false,
+  activeProvider: "gemini",
+  providerCooldown: { gemini: 0, ollama: 0 },
+  providerFails: { gemini: 0, ollama: 0 }
+};
+
+/* ═══════════════════════════════════════════════════
+   3. AI (PROVIDER CHAIN & PROMPTS)
+═══════════════════════════════════════════════════ */
+function getKey(){ try{ return localStorage.getItem("whodunit_key")||""; }catch{ return ""; } }
+function saveKey(k){ try{ localStorage.setItem("whodunit_key",k); }catch{} }
+
+function providerCooledDown(p){ return Date.now() >= state.providerCooldown[p]; }
+function recordProviderFail(p){
+  state.providerFails[p]++;
+  if(state.providerFails[p] >= 2){
+    state.providerCooldown[p] = Date.now() + PROVIDER_COOLDOWN;
+    state.providerFails[p] = 0;
+  }
+}
+function recordProviderSuccess(p){
+  state.providerFails[p] = 0;
+  state.providerCooldown[p] = 0;
+}
+function setFooterProvider(provider, model){
+  const el = document.getElementById("footer-model");
+  if(el) el.textContent = provider === "ollama" ? `Ollama local (${model})` : `Gemini cloud (${model})`;
+}
+function showSwitchBanner(msg){
+  const b = document.getElementById("switch-banner");
+  if(!b) return;
+  document.getElementById("switch-msg").textContent = msg;
+  b.classList.remove("hidden");
+  clearTimeout(b._hideTimer);
+  b._hideTimer = setTimeout(()=>b.classList.add("hidden"), 8000);
+}
+
+async function detectOllama(){
+  const chip = document.getElementById("ollama-chip");
+  if(!chip) return;
+  try{
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>ctrl.abort(), 2000);
+    let res;
+    try{ res = await fetch(`${OLLAMA_URL}/api/tags`, {signal:ctrl.signal}); }
+    finally{ clearTimeout(t); }
+    if(!res.ok) throw new Error();
+    const data = await res.json();
+    state.ollamaAvail = true;
+    const models = (data.models||[]).map(m=>m.name||m.model||"");
+    const hasModel = models.some(n => n === OLLAMA_MODEL || n.startsWith(OLLAMA_MODEL+":"));
+    state.ollamaHasModel = hasModel;
+    if(hasModel){
+      chip.className = "ready";
+      chip.textContent = "⬤ Local AI: ready (" + OLLAMA_MODEL + ")";
+      warmUpOllama();
+    } else {
+      chip.className = "warn";
+      chip.textContent = "⚠ Local AI: model missing — run: ollama pull " + OLLAMA_MODEL;
+    }
+  }catch{
+    state.ollamaAvail = false;
+    chip.className = "off";
+    chip.textContent = "⬤ Local AI: not running (optional)";
+  }
+}
+
+async function warmUpOllama(){
+  try{
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>ctrl.abort(), 30000);
+    try{
+      await fetch(`${OLLAMA_URL}/api/generate`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:OLLAMA_MODEL,prompt:"Reply OK",stream:false,keep_alive:"30m",options:{num_predict:4}}),
+        signal:ctrl.signal
+      });
+    }finally{ clearTimeout(t); }
+  }catch{}
+}
+
+async function callGemini(prompt, expectJson){
+  const key = getKey();
+  if(!key) throw new Error("no_key");
+
+  const body = {
+    contents:[{role:"user",parts:[{text:prompt}]}],
+    generationConfig:{temperature:0.9,maxOutputTokens:2400}
+  };
+  if(expectJson) body.generationConfig.responseMimeType = "application/json";
+
+  const order = Array.from({length:MODELS.length},(_,i)=>(state.modelIdx+i)%MODELS.length);
+  let lastErr = null;
+
+  for(const idx of order){
+    const model = MODELS[idx];
+    const url = `${API_BASE}/${model}:generateContent?key=${key}`;
+    try{
+      const ctrl = new AbortController();
+      const t = setTimeout(()=>ctrl.abort(), TIMEOUT_GEMINI);
+      let res;
+      try{ res = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ctrl.signal}); }
+      finally{ clearTimeout(t); }
+
+      if(res.status===404 || res.status===429){ lastErr = new Error(`${model}: HTTP ${res.status}`); continue; }
+      if(res.status===401 || res.status===403) throw new Error("API key rejected (401/403). Check your key.");
+      if(!res.ok){ const t = await res.text().catch(()=>""); throw new Error(`Gemini API ${res.status}: ${t.slice(0,120)}`); }
+
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if(!text) throw new Error("Empty/blocked response from Gemini.");
+
+      state.modelIdx = idx;
+      recordProviderSuccess("gemini");
+      setFooterProvider("gemini", model);
+
+      if(!expectJson) return text.trim();
+      const clean = text.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"").trim();
+      return JSON.parse(clean);
+    }catch(err){
+      if(err.name==="AbortError"){ lastErr = new Error(`Gemini model ${MODELS[idx]} timed out.`); continue; }
+      if(err.message.includes("401/403")) throw err;
+      if(err instanceof SyntaxError) throw new Error(`Gemini returned invalid JSON: ${err.message}`);
+      lastErr = err; continue;
+    }
+  }
+  recordProviderFail("gemini");
+  throw lastErr || new Error("All Gemini models failed.");
+}
+
+async function callOllama(prompt, expectJson){
+  if(!state.ollamaAvail || !state.ollamaHasModel) throw new Error("Ollama not ready.");
+  const body = {
+    model: OLLAMA_MODEL,
+    prompt,
+    stream: false,
+    keep_alive: "30m",
+    options: { temperature: 0.8, num_predict: expectJson ? 1800 : 350 }
+  };
+  if(expectJson) body.format = "json";
+
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), TIMEOUT_OLLAMA);
+  let res;
+  try{ res = await fetch(`${OLLAMA_URL}/api/generate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ctrl.signal}); }
+  finally{ clearTimeout(t); }
+
+  if(!res.ok){
+    recordProviderFail("ollama");
+    throw new Error(`Ollama HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  let text = (data.response||"").trim();
+  if(!text){ recordProviderFail("ollama"); throw new Error("Ollama returned empty response."); }
+
+  recordProviderSuccess("ollama");
+  setFooterProvider("ollama", OLLAMA_MODEL);
+
+  if(!expectJson) return text;
+  const clean = text.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"").trim();
+  return JSON.parse(clean);
+}
+
+async function callAI(prompt, expectJson=false, ollamaPromptOverride=null){
+  const key = getKey();
+  const geminiOk = !!key && providerCooledDown("gemini");
+  const ollamaOk = state.ollamaAvail && state.ollamaHasModel && providerCooledDown("ollama");
+
+  if(geminiOk){
+    try{
+      const result = await callGemini(prompt, expectJson);
+      if(state.activeProvider !== "gemini"){
+        state.activeProvider = "gemini";
+        showSwitchBanner("Switched back to Gemini AI.");
+      }
+      return result;
+    }catch(err){
+      if(err.message === "no_key" || err.message.includes("401/403")) throw err;
+      if(ollamaOk){
+        const wasGemini = state.activeProvider === "gemini";
+        state.activeProvider = "ollama";
+        if(wasGemini) showSwitchBanner("Gemini quota reached. Switched to local AI (" + OLLAMA_MODEL + ").");
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  if(ollamaOk){
+    const p = ollamaPromptOverride || prompt;
+    const result = await callOllama(p, expectJson);
+    state.activeProvider = "ollama";
+    return result;
+  }
+
+  if(!key && !ollamaOk) throw new Error("No AI available: enter a Gemini key or start Ollama.");
+  if(!geminiOk && !ollamaOk) throw new Error("Both AI providers are temporarily in cooldown. Wait 30 s.");
+  throw new Error("No AI provider succeeded.");
+}
+
+function casePrompt(theme){
+  return `You are a creative mystery author. Generate a rich murder mystery case JSON.
+Theme: "${theme}"
+Return ONLY valid JSON (no markdown fence, no extra text):
+{
+  "title": "Short title",
+  "setting": "Location and period",
+  "victim": "Victim name and brief role",
+  "summary": "2-3 sentences introducing the crime scene to the detective",
+  "visual": {
+    "scene": "mansion",
+    "time": "night",
+    "weather": "storm",
+    "sky1": "#090a16",
+    "sky2": "#1a162b",
+    "accent": "#c8a84b"
+  },
+  "suspects": [
+    {
+      "id": "s1", "name": "Full Name", "role": "Occupation/Relation", "personality": "2-3 traits", "alibi": "Alibi sentence", "secret": "Secret sentence",
+      "look": {"skin":"light","hairStyle":"bun","hairColor":"gray","outfitColor":"#6c3483","accessory":"earrings"}
+    },
+    {
+      "id": "s2", "name": "Full Name", "role": "Occupation/Relation", "personality": "2-3 traits", "alibi": "Alibi sentence", "secret": "Secret sentence",
+      "look": {"skin":"tan","hairStyle":"short","hairColor":"brown","outfitColor":"#2874a6","accessory":"glasses"}
+    },
+    {
+      "id": "s3", "name": "Full Name", "role": "Occupation/Relation", "personality": "2-3 traits", "alibi": "Alibi sentence", "secret": "Secret sentence",
+      "look": {"skin":"light","hairStyle":"long","hairColor":"red","outfitColor":"#b9770e","accessory":"scarf"}
+    },
+    {
+      "id": "s4", "name": "Full Name", "role": "Occupation/Relation", "personality": "2-3 traits", "alibi": "Alibi sentence", "secret": "Secret sentence",
+      "look": {"skin":"dark","hairStyle":"bald","hairColor":"black","outfitColor":"#2c3e50","accessory":"mustache"}
+    }
+  ],
+  "culpritId": "s4",
+  "truth": "Detailed paragraph explaining what really happened, motive, and the key clue."
+}
+Rules:
+- scene must be one of: mansion, hotel, spaceship, school, ship, theater
+- time must be one of: night, dusk, day
+- weather must be one of: clear, rain, fog, storm
+- skin: light, tan, brown, dark; hairStyle: short, long, bun, curly, bald, cap; hairColor: black, brown, blonde, red, gray, white, blue; accessory: none, glasses, hat, scarf, mustache, earrings
+- exactly 4 suspects (ids s1, s2, s3, s4); culpritId matches one id; all fields required.`;
+}
+
+function casePromptLocal(theme){
+  return `Generate a murder mystery case JSON for theme "${theme}". Output ONLY JSON:
+{
+  "title": "Title", "setting": "Setting", "victim": "Victim", "summary": "Scene intro",
+  "visual": {"scene":"mansion","time":"night","weather":"storm","sky1":"#090a16","sky2":"#1a162b","accent":"#c8a84b"},
+  "suspects": [
+    {"id":"s1","name":"Name 1","role":"Role 1","personality":"traits","alibi":"Alibi","secret":"Secret","look":{"skin":"light","hairStyle":"short","hairColor":"black","outfitColor":"#334466","accessory":"none"}},
+    {"id":"s2","name":"Name 2","role":"Role 2","personality":"traits","alibi":"Alibi","secret":"Secret","look":{"skin":"tan","hairStyle":"long","hairColor":"brown","outfitColor":"#663344","accessory":"glasses"}},
+    {"id":"s3","name":"Name 3","role":"Role 3","personality":"traits","alibi":"Alibi","secret":"Secret","look":{"skin":"brown","hairStyle":"bun","hairColor":"blonde","outfitColor":"#336644","accessory":"scarf"}},
+    {"id":"s4","name":"Name 4","role":"Role 4","personality":"traits","alibi":"Alibi","secret":"Secret","look":{"skin":"dark","hairStyle":"bald","hairColor":"black","outfitColor":"#443366","accessory":"mustache"}}
+  ],
+  "culpritId": "s2",
+  "truth": "What happened and the subtle clue."
+}
+Rules: ids s1-s4; scene in [mansion, hotel, spaceship, school, ship, theater]; weather in [clear, rain, fog, storm].`;
+}
+
+function dialoguePrompt(suspect, q, history){
+  const cd = state.caseData;
+  const isC = suspect.id === cd.culpritId;
+  const hist = history.slice(-6).map(m=>`${m.role==="player"?"Detective":suspect.name}: ${m.text}`).join("\n");
+  return `You are playing ${suspect.name} (${suspect.role}) in a noir murder mystery game.
+Context:
+- Setting: ${cd.setting} | Victim: ${cd.victim}
+- Your alibi: ${suspect.alibi}
+- Your secret: ${suspect.secret}
+- Culprit? ${isC ? "YES (you committed the murder; deflect convincingly, don't confess)" : "NO (truthful about the crime, evasive about your own secret)"}
+${isC ? `- Truth: ${cd.truth}` : ""}
+
+Recent exchange:
+${hist || "(first question)"}
+
+Detective asks: "${q}"
+
+Rules:
+- Reply in 1-3 sentences in character.
+- On a new final line write exactly [mood: X] where X is one of neutral, nervous, angry, sad, smug. Mood must NOT reliably reveal guilt.`;
+}
+
+function dialoguePromptLocal(suspect, q, history){
+  const cd = state.caseData;
+  const isC = suspect.id === cd.culpritId;
+  const hist = history.slice(-6).map(m=>`${m.role==="player"?"Detective":suspect.name}: ${m.text}`).join("\n");
+  return `You play ${suspect.name}, ${suspect.role}, in a mystery game.
+Personality: ${suspect.personality}. Alibi: ${suspect.alibi}. Secret: ${suspect.secret}.
+${isC ? "You are guilty; lie and deflect." : "You are innocent; answer truthfully about crime."}
+Recent chat:
+${hist || "(first question)"}
+Detective asks: ${q}
+Reply in at most 3 sentences, in first person.
+On a new final line write exactly [mood: X] where X is one of neutral, nervous, angry, sad, smug.`;
+}
+
+function epiloguePromptLocal(won, accusedName, culpritName){
+  return `Write a 3-sentence noir epilogue in plain text. The detective ${won?"correctly":"incorrectly"} accused ${accusedName}. The real killer is ${culpritName}. Tone: ${won?"triumphant but sobering":"grim — justice failed"}.`;
+}
+
+/* ═══════════════════════════════════════════════════
+   4. VALIDATION & SANITIZATION
+═══════════════════════════════════════════════════ */
+function validateCase(o){
+  if(!o || typeof o !== "object") return false;
+  const req = ["title","setting","victim","summary","suspects","culpritId","truth"];
+  if(!req.every(k => k in o && o[k])) return false;
+  if(!Array.isArray(o.suspects) || o.suspects.length !== 4) return false;
+  const ids = ["s1","s2","s3","s4"];
+  if(!o.suspects.every((s,i) => s.id === ids[i] && s.name && s.role && s.personality && s.alibi && s.secret)) return false;
+  if(!ids.includes(o.culpritId)) return false;
+  return true;
+}
+
+function sanitizeVisual(cd){
+  if(!cd) return;
+  const SCENES = ["mansion","hotel","spaceship","school","ship","theater"];
+  const TIMES = ["night","dusk","day"];
+  const WEATHERS = ["clear","rain","fog","storm"];
+  const SKINS = ["light","tan","brown","dark"];
+  const HAIRS = ["short","long","bun","curly","bald","cap"];
+  const COLORS = ["black","brown","blonde","red","gray","white","blue"];
+  const ACCESSORIES = ["none","glasses","hat","scarf","mustache","earrings"];
+
+  if(!cd.visual || typeof cd.visual !== "object") cd.visual = {};
+  if(!SCENES.includes(cd.visual.scene)) cd.visual.scene = "mansion";
+  if(!TIMES.includes(cd.visual.time)) cd.visual.time = "night";
+  if(!WEATHERS.includes(cd.visual.weather)) cd.visual.weather = "clear";
+  if(!cd.visual.sky1 || !/^#[0-9a-f]{6}$/i.test(cd.visual.sky1)) cd.visual.sky1 = "#090a16";
+  if(!cd.visual.sky2 || !/^#[0-9a-f]{6}$/i.test(cd.visual.sky2)) cd.visual.sky2 = "#1a162b";
+  if(!cd.visual.accent || !/^#[0-9a-f]{6}$/i.test(cd.visual.accent)) cd.visual.accent = "#c8a84b";
+
+  const defaultLooks = [
+    { skin: "light", hairStyle: "bun", hairColor: "gray", outfitColor: "#6c3483", accessory: "earrings" },
+    { skin: "tan", hairStyle: "short", hairColor: "brown", outfitColor: "#2874a6", accessory: "glasses" },
+    { skin: "light", hairStyle: "long", hairColor: "red", outfitColor: "#b9770e", accessory: "scarf" },
+    { skin: "dark", hairStyle: "bald", hairColor: "black", outfitColor: "#2c3e50", accessory: "mustache" }
+  ];
+
+  if(Array.isArray(cd.suspects)){
+    cd.suspects.forEach((s, i) => {
+      const def = defaultLooks[i % defaultLooks.length];
+      if(!s.look || typeof s.look !== "object") s.look = { ...def };
+      if(!SKINS.includes(s.look.skin)) s.look.skin = def.skin;
+      if(!HAIRS.includes(s.look.hairStyle)) s.look.hairStyle = def.hairStyle;
+      if(!COLORS.includes(s.look.hairColor)) s.look.hairColor = def.hairColor;
+      if(!s.look.outfitColor || !/^#[0-9a-f]{6}$/i.test(s.look.outfitColor)) s.look.outfitColor = def.outfitColor;
+      if(!ACCESSORIES.includes(s.look.accessory)) s.look.accessory = def.accessory;
+    });
+  }
+}
+
+function parseMood(rawText){
+  let mood = "neutral";
+  let text = (rawText||"").trim();
+  const match = text.match(/\[mood:\s*(neutral|nervous|angry|sad|smug)\]/i);
+  if(match){
+    mood = match[1].toLowerCase();
+    text = text.replace(/\[mood:\s*(neutral|nervous|angry|sad|smug)\]/i, "").trim();
+  }
+  return { text, mood };
+}
+
+/* ═══════════════════════════════════════════════════
+   OFFLINE DATA
+═══════════════════════════════════════════════════ */
+const OFFLINE_CASE = {
+  title: "Death at Dunmore Hall",
+  setting: "A grand Victorian country house during a weekend house party, 1923.",
+  victim: "Lord Reginald Dunmore — wealthy estate owner and industrialist",
+  summary: "Lord Dunmore was found dead in his locked study Saturday morning, poisoned by arsenic in his nightly brandy. Four guests were staying at the estate. Staff report the victim changed his will the previous afternoon — a fact only the guests could have overheard through the thin library wall.",
+  visual: {
+    scene: "mansion",
+    time: "night",
+    weather: "storm",
+    sky1: "#0b0c1e",
+    sky2: "#1d152b",
+    accent: "#c8a84b"
+  },
+  suspects: [
+    {
+      id: "s1", name: "Lady Cecily Hartwood", role: "Widow, Dunmore's sister-in-law",
+      personality: "Gracious but icy; speaks in careful measured sentences.",
+      alibi: "Claims she retired at 9 pm with a headache.",
+      secret: "Stood to inherit under the old will; the new will cuts her out.",
+      look: { skin: "light", hairStyle: "bun", hairColor: "gray", outfitColor: "#6c3483", accessory: "earrings" }
+    },
+    {
+      id: "s2", name: "Dr. Felix Crane", role: "Physician and old friend",
+      personality: "Jovial, verbose; nervous laughter under pressure.",
+      alibi: "Says he was playing cards with the butler until midnight.",
+      secret: "Treated Dunmore for a heart condition, feared malpractice exposure.",
+      look: { skin: "tan", hairStyle: "short", hairColor: "brown", outfitColor: "#2874a6", accessory: "glasses" }
+    },
+    {
+      id: "s3", name: "Miss Iris Vane", role: "Journalist, uninvited guest",
+      personality: "Sharp and inquisitive; deflects with wit.",
+      alibi: "Walking the grounds taking notes until 11 pm.",
+      secret: "Was blackmailing Dunmore over a scandal from his past.",
+      look: { skin: "light", hairStyle: "long", hairColor: "red", outfitColor: "#b9770e", accessory: "scarf" }
+    },
+    {
+      id: "s4", name: "Mr. Harold Fitch", role: "Solicitor who drafted the new will",
+      personality: "Nervous and pedantic; sweats under scrutiny.",
+      alibi: "Insists he left immediately after dinner.",
+      secret: "He forged a clause in the will for personal gain — Dunmore had just discovered it.",
+      look: { skin: "dark", hairStyle: "bald", hairColor: "black", outfitColor: "#2c3e50", accessory: "mustache" }
+    }
+  ],
+  culpritId: "s4",
+  truth: "Harold Fitch poisoned Lord Dunmore's brandy after dinner, desperate to prevent exposure of his forged clause. He obtained arsenic from the garden shed that afternoon. The key clue: Fitch claims he left 'immediately after dinner', yet the cook saw him near the study corridor at 10 pm. Only Fitch knew which decanter Dunmore used each night — yet claimed never to have visited the study."
+};
+
+const OFFLINE_REPLIES = {
+  s1: [
+    "I had no reason to harm Reginald — he was my late husband's brother. My loyalty to this family has never wavered.",
+    "My headache was severe. I did not leave my room after nine; the housemaid brought me lavender water and can confirm every minute.",
+    "The new will is distressing, yes. But I am not a murderous woman, Detective.",
+    "I heard footsteps in the corridor near ten, but assumed it was one of the men heading to the billiard room."
+  ],
+  s2: [
+    "Ha! A dreadful business — quite dreadful. Reginald seemed in perfectly good spirits when I last saw him.",
+    "The butler Jennings and I played three hands of whist. Ask him — he'll confirm every minute of it.",
+    "Arsenic? Any physician knows the substance. That hardly makes me guilty, Detective.",
+    "I prescribed him a restorative tonic last month. Nothing unusual whatsoever."
+  ],
+  s3: [
+    "I notice things, Detective — that's my trade. And what I noticed is that at least two guests had powerful reasons to want Dunmore silent.",
+    "I was outside until eleven. My field notebooks are timestamped if you care to check.",
+    "Dunmore and I had a complicated arrangement. I'll say no more about that particular matter.",
+    "His secrets were worth far more to me while he was breathing. Think carefully about that."
+  ],
+  s4: [
+    "I left immediately after dinner. Long drive back to the city — I'm always punctual about these things.",
+    "The will was entirely proper and above board. I take great pride in my professional accuracy.",
+    "I — well, I may have stepped back inside briefly, but only to retrieve my gloves from the hall.",
+    "The decanter? I really wouldn't know a thing about where Dunmore kept his evening brandy."
+  ]
+};
+
+const OFFLINE_EPILOGUE = "Harold Fitch was arrested the following morning after the cook came forward and a London barrister confirmed the forged clause. The estate passed in full to the village charitable trust — exactly as the genuine will intended. Some men, it seems, gamble everything on a single crooked line of ink.";
+
+/* ═══════════════════════════════════════════════════
+   5. PROCEDURAL SCENE GENERATOR (drawScene)
+═══════════════════════════════════════════════════ */
+function cyrb128(str){
+  let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+  for(let i=0, k; i<str.length; i++){
+    k = str.charCodeAt(i);
+    h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+    h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+    h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+    h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+  }
+  return (h1 >>> 0) / 4294967296;
+}
+function makeRng(seedStr){
+  let s = Math.floor(cyrb128(seedStr || "case") * 0xFFFFFFFF);
+  return function(){
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function drawScene(visual, seed="seed"){
+  const rng = makeRng(seed);
+  const { scene, time, weather, sky1, sky2, accent } = visual;
+
+  // Celestial body
+  let celestial = "";
+  if(time === "night" || time === "dusk"){
+    celestial = `
+      <g filter="drop-shadow(0 0 20px rgba(250,250,230,0.5))">
+        <circle cx="1060" cy="115" r="38" fill="#fcfcf0"/>
+        <circle cx="1046" cy="110" r="34" fill="${sky1}" opacity=".78"/>
+      </g>
+    `;
+  } else {
+    celestial = `
+      <circle cx="1040" cy="120" r="46" fill="#ffd54f" filter="drop-shadow(0 0 35px rgba(255,213,79,0.75))"/>
+    `;
+  }
+
+  // Stars
+  let stars = "";
+  if(time === "night"){
+    for(let i=0; i<50; i++){
+      const sx = Math.floor(rng() * 1260) + 10;
+      const sy = Math.floor(rng() * 300) + 10;
+      const sr = (rng() * 1.6 + 0.7).toFixed(1);
+      const sop = (rng() * 0.65 + 0.35).toFixed(2);
+      stars += `<circle cx="${sx}" cy="${sy}" r="${sr}" fill="#fff" opacity="${sop}"/>`;
+    }
+  }
+
+  // Landmarks per scene
+  let landmark = "";
+  if(scene === "mansion"){
+    landmark = `
+      <!-- Victorian Gothic Manor -->
+      <polygon points="680,110 380,230 980,230" fill="#131422" stroke="#25273d" stroke-width="2"/>
+      <rect x="410" y="230" width="540" height="290" fill="#171828"/>
+      <!-- Balustrade and pediment relief -->
+      <polygon points="680,140 440,230 920,230" fill="#1d1e32"/>
+      <!-- Grand Classical Columns -->
+      <rect x="490" y="230" width="22" height="290" fill="#282a44"/>
+      <rect x="610" y="230" width="22" height="290" fill="#282a44"/>
+      <rect x="730" y="230" width="22" height="290" fill="#282a44"/>
+      <rect x="850" y="230" width="22" height="290" fill="#282a44"/>
+      <!-- Glowing Warm Windows with Arches -->
+      <rect x="435" y="245" width="38" height="60" rx="6" fill="#ffeaa7" class="flicker"/>
+      <rect x="545" y="245" width="38" height="60" rx="6" fill="#222438"/>
+      <rect x="785" y="245" width="38" height="60" rx="6" fill="#ffeaa7" class="flicker"/>
+      <rect x="895" y="245" width="38" height="60" rx="6" fill="#ffeaa7" class="flicker"/>
+      <!-- Lower windows placed on far wings -->
+      <rect x="360" y="360" width="34" height="55" rx="6" fill="#222438"/>
+      <rect x="965" y="360" width="34" height="55" rx="6" fill="#ffeaa7" class="flicker"/>
+      <!-- Double Entrance Door -->
+      <rect x="650" y="390" width="60" height="130" rx="4" fill="#0d0e18" stroke="#333754" stroke-width="2"/>
+      <line x1="680" y1="390" x2="680" y2="520" stroke="#333754" stroke-width="2"/>
+      <circle cx="673" cy="455" r="3" fill="#c8a84b"/>
+      <circle cx="687" cy="455" r="3" fill="#c8a84b"/>
+      <!-- Wrought Iron Gate -->
+      <path d="M340 520 L1020 520 M360 460 L360 520 M400 450 L400 520 M440 460 L440 520 M920 460 L920 520 M960 450 L960 520 M1000 460 L1000 520" stroke="#3d425c" stroke-width="3"/>
+    `;
+  } else if(scene === "hotel"){
+    landmark = `
+      <!-- Grand Hotel Skyscraper -->
+      <rect x="490" y="90" width="380" height="430" fill="#141628" stroke="#252945" stroke-width="2"/>
+      <polygon points="680,45 665,90 695,90" fill="#242848"/>
+      <line x1="680" y1="20" x2="680" y2="45" stroke="#ffd700" stroke-width="2.5"/>
+      <!-- Art Deco Stepped Spire -->
+      <rect x="540" y="60" width="280" height="30" fill="#1a1d35"/>
+      <rect x="600" y="35" width="160" height="25" fill="#202440"/>
+      <!-- Neon Marquee Canopy -->
+      <rect x="560" y="465" width="240" height="30" rx="4" fill="#a07030" stroke="#ffd700" stroke-width="1.5"/>
+      <text x="680" y="486" fill="#fff" font-size="13" font-weight="900" text-anchor="middle" letter-spacing="4">GRAND HOTEL</text>
+      <!-- Illuminated Grid Windows -->
+      ${Array.from({length:28}, (_,i)=>{
+        const r = Math.floor(i / 4), c = i % 4;
+        const wx = 530 + c * 82, wy = 120 + r * 46;
+        const lit = rng() > 0.42;
+        return `<rect x="${wx}" y="${wy}" width="42" height="28" rx="2" fill="${lit?'#ffeaa7':'#1c1f36'}" class="${lit?'flicker':''}"/>`;
+      }).join("")}
+    `;
+  } else if(scene === "spaceship"){
+    landmark = `
+      <!-- Deep Space Observation Dome -->
+      <circle cx="680" cy="270" r="185" fill="#02030a" stroke="#333d54" stroke-width="20"/>
+      <!-- Giant Ringed Planet -->
+      <circle cx="730" cy="235" r="60" fill="#7d3c98"/>
+      <ellipse cx="730" cy="235" rx="105" ry="24" fill="none" stroke="#d2b4de" stroke-width="6" transform="rotate(-24 730 235)"/>
+      <circle cx="620" cy="300" r="16" fill="#1abc9c" opacity=".85"/>
+      <!-- Curved Bulkhead Girders -->
+      <path d="M200 520 L200 170 Q680 75 1160 170 L1160 520" fill="none" stroke="#252e42" stroke-width="26"/>
+      <!-- Terminal Status Indicators -->
+      <rect x="420" y="490" width="20" height="8" rx="2" fill="#00e676"/>
+      <rect x="450" y="490" width="20" height="8" rx="2" fill="#ff5252"/>
+      <rect x="480" y="490" width="20" height="8" rx="2" fill="#40c4ff"/>
+      <rect x="880" y="490" width="20" height="8" rx="2" fill="#ffd740"/>
+    `;
+  } else if(scene === "school"){
+    landmark = `
+      <!-- Gothic Academy Clock Tower -->
+      <rect x="450" y="200" width="460" height="320" fill="#171826" stroke="#2a2b42" stroke-width="2"/>
+      <polygon points="680,75 610,180 750,180" fill="#25273d"/>
+      <rect x="620" y="180" width="120" height="130" fill="#202235"/>
+      <!-- Illuminated Clock Face -->
+      <circle cx="680" cy="235" r="30" fill="#fffbe8" stroke="#333" stroke-width="3"/>
+      <line x1="680" y1="235" x2="680" y2="216" stroke="#222" stroke-width="3.5"/>
+      <line x1="680" y1="235" x2="696" y2="235" stroke="#222" stroke-width="2.5"/>
+      <!-- Academy Windows -->
+      <rect x="485" y="280" width="42" height="65" rx="10" fill="#ffeaa7" class="flicker"/>
+      <rect x="555" y="280" width="42" height="65" rx="10" fill="#24263b"/>
+      <rect x="765" y="280" width="42" height="65" rx="10" fill="#ffeaa7" class="flicker"/>
+      <rect x="835" y="280" width="42" height="65" rx="10" fill="#24263b"/>
+      <!-- Flagpole with Waving Pennant -->
+      <line x1="770" y1="105" x2="770" y2="210" stroke="#888" stroke-width="2.5"/>
+      <polygon points="770,105 820,118 770,131" fill="${accent}"/>
+    `;
+  } else if(scene === "ship"){
+    landmark = `
+      <!-- Luxury Steamship Deck & Giant Funnel -->
+      <polygon points="740,110 830,110 800,450 710,450" fill="#c0392b"/>
+      <rect x="720" y="110" width="100" height="48" fill="#151515"/>
+      <!-- Plume of steam -->
+      <ellipse cx="830" cy="75" rx="45" ry="20" fill="#fff" opacity=".14"/>
+      <!-- Lifeboat Davit -->
+      <path d="M460 310 Q550 298 640 310 L620 338 L480 338 Z" fill="#f0f3f4" stroke="#333" stroke-width="2"/>
+      <!-- Triple Deck Railing -->
+      <line x1="260" y1="450" x2="1100" y2="450" stroke="#a6b4b5" stroke-width="3"/>
+      <line x1="260" y1="475" x2="1100" y2="475" stroke="#a6b4b5" stroke-width="3"/>
+      <line x1="260" y1="500" x2="1100" y2="500" stroke="#a6b4b5" stroke-width="3"/>
+      <!-- Ocean horizon wave -->
+      <path d="M0 520 Q320 512 640 520 T1280 520" stroke="#2980b9" stroke-width="2" fill="none"/>
+    `;
+  } else {
+    // Theater
+    landmark = `
+      <!-- Grand Proscenium Arch & Draped Velvet Curtains -->
+      <rect x="0" y="0" width="1280" height="70" fill="#3b1016"/>
+      <path d="M0 0 L280 0 Q220 250 170 520 L0 520 Z" fill="#751b24"/>
+      <path d="M1280 0 L1000 0 Q1060 250 1110 520 L1280 520 Z" fill="#751b24"/>
+      <path d="M260 0 Q640 95 1020 0 L970 70 Q640 135 310 70 Z" fill="#93232f"/>
+      <!-- Overhead Spotlights Bar -->
+      <rect x="360" y="60" width="560" height="12" rx="3" fill="#222"/>
+      <circle cx="460" cy="75" r="8" fill="#ffd700"/>
+      <circle cx="640" cy="75" r="8" fill="#ffd700"/>
+      <circle cx="820" cy="75" r="8" fill="#ffd700"/>
+      <!-- Audience Silhouettes -->
+      <ellipse cx="380" cy="535" rx="42" ry="18" fill="#120507"/>
+      <ellipse cx="500" cy="535" rx="42" ry="18" fill="#120507"/>
+      <ellipse cx="620" cy="535" rx="42" ry="18" fill="#120507"/>
+      <ellipse cx="740" cy="535" rx="42" ry="18" fill="#120507"/>
+      <ellipse cx="860" cy="535" rx="42" ry="18" fill="#120507"/>
+    `;
+  }
+
+  // Floor
+  const floor = `
+    <!-- Solid Room / Ground Floor Strip -->
+    <rect x="0" y="520" width="1280" height="200" fill="#090a14"/>
+    <line x1="0" y1="520" x2="1280" y2="520" stroke="#2e324c" stroke-width="2.5"/>
+    <line x1="0" y1="580" x2="1280" y2="580" stroke="#151724" stroke-width="1.5"/>
+    <line x1="0" y1="640" x2="1280" y2="640" stroke="#151724" stroke-width="1.5"/>
+  `;
+
+  // Atmospheric Low-lying Ground Mist (NOT obscuring the house)
+  let mist = "";
+  if(weather === "fog" || weather === "storm"){
+    mist = `
+      <g class="mist-anim" opacity=".4">
+        <rect x="0" y="470" width="1280" height="60" fill="url(#groundMist)"/>
+        <ellipse cx="380" cy="505" rx="320" ry="24" fill="#3a4b62" filter="blur(16px)" opacity=".4"/>
+        <ellipse cx="900" cy="505" rx="360" ry="26" fill="#3a4b62" filter="blur(18px)" opacity=".4"/>
+      </g>
+    `;
+  }
+
+  return `
+    <defs>
+      <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="${sky1}"/>
+        <stop offset="100%" stop-color="${sky2}"/>
+      </linearGradient>
+      <linearGradient id="groundMist" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2a3b50" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#141d28" stop-opacity="0.35"/>
+      </linearGradient>
+      <radialGradient id="spotlightGrad" cx="50%" cy="0%" r="90%">
+        <stop offset="0%" stop-color="#fff" stop-opacity="0.32"/>
+        <stop offset="65%" stop-color="#ffeaa7" stop-opacity="0.08"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <!-- Sky background -->
+    <rect x="0" y="0" width="1280" height="520" fill="url(#skyGrad)"/>
+    ${celestial}
+    ${stars}
+    ${landmark}
+    ${floor}
+    ${mist}
+  `;
+}
+
+/* ═══════════════════════════════════════════════════
+   6. AVATARS (drawAvatar)
+═══════════════════════════════════════════════════ */
+function drawAvatar(look, mood="neutral", isDetective=false, mouthOpen=false, handcuffed=false){
+  const skinTones = {
+    light: "#ffdfc4",
+    tan:   "#cf9e76",
+    brown: "#8d5524",
+    dark:  "#442718"
+  };
+  const hairTones = {
+    black:  "#1c1c1c",
+    brown:  "#503221",
+    blonde: "#e5c158",
+    red:    "#a93826",
+    gray:   "#88889a",
+    white:  "#e2e2ec",
+    blue:   "#2c6b9e"
+  };
+
+  const skin = skinTones[look.skin] || skinTones.light;
+  const hair = hairTones[look.hairColor] || hairTones.black;
+  const outfit = look.outfitColor || "#2b3d52";
+
+  // If detective
+  if(isDetective){
+    const detMouth = mouthOpen
+      ? `<ellipse cx="80" cy="85" rx="6" ry="4" fill="#2d1313"/>`
+      : `<path d="M74 85 Q80 87 86 85" stroke="#222" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+
+    return `
+      <g>
+        <!-- Detective Fedora -->
+        <ellipse cx="80" cy="38" rx="46" ry="12" fill="#26221c"/>
+        <path d="M52 38 C52 14 108 14 108 38 Z" fill="#26221c"/>
+        <rect x="52" y="32" width="56" height="6" fill="#c8a84b"/>
+        <!-- Head -->
+        <ellipse cx="80" cy="65" rx="28" ry="32" fill="${skinTones.tan}"/>
+        <!-- Trenchcoat & Collar -->
+        <path d="M30 195 L46 102 Q80 88 114 102 L130 195 Z" fill="#42392d"/>
+        <polygon points="80,102 68,138 92,138" fill="#eaeaf4"/>
+        <polygon points="80,118 76,170 84,170" fill="#8b1e1e"/>
+        <path d="M48 106 L74 150 L58 150 Z" fill="#2e271f"/>
+        <path d="M112 106 L86 150 L102 150 Z" fill="#2e271f"/>
+        <!-- Eyes & Brows (Observant) -->
+        <path d="M60 52 Q68 49 74 52" stroke="#111" stroke-width="2.5" fill="none"/>
+        <path d="M86 52 Q92 49 100 52" stroke="#111" stroke-width="2.5" fill="none"/>
+        <circle cx="67" cy="62" r="3.5" fill="#111"/>
+        <circle cx="93" cy="62" r="3.5" fill="#111"/>
+        <path d="M78 66 Q82 72 77 75 L83 75" stroke="#333" stroke-width="1.8" fill="none"/>
+        ${detMouth}
+      </g>
+    `;
+  }
+
+  // Suspect avatar
+  let brows = "", eyes = "", blush = "", sweat = "";
+  if(mood === "nervous"){
+    brows = `
+      <path d="M60 48 Q67 44 74 48" stroke="#222" stroke-width="2.5" fill="none"/>
+      <path d="M86 48 Q93 44 100 48" stroke="#222" stroke-width="2.5" fill="none"/>
+    `;
+    eyes = `
+      <ellipse cx="67" cy="62" rx="5" ry="5.5" fill="#fff"/>
+      <ellipse cx="93" cy="62" rx="5" ry="5.5" fill="#fff"/>
+      <circle cx="69" cy="62" r="3" fill="#111"/>
+      <circle cx="95" cy="62" r="3" fill="#111"/>
+    `;
+    sweat = `<path d="M106 50 C106 46 112 40 112 40 C112 40 118 46 118 50 C118 53 115 56 112 56 C109 56 106 53 106 50 Z" fill="#4fc3f7"/>`;
+  } else if(mood === "angry"){
+    brows = `
+      <line x1="59" y1="49" x2="75" y2="55" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+      <line x1="101" y1="49" x2="85" y2="55" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+    `;
+    eyes = `
+      <ellipse cx="67" cy="63" rx="4.5" ry="3.5" fill="#111"/>
+      <ellipse cx="93" cy="63" rx="4.5" ry="3.5" fill="#111"/>
+    `;
+    blush = `
+      <ellipse cx="58" cy="73" rx="8" ry="4" fill="#ff4d4d" opacity="0.38"/>
+      <ellipse cx="102" cy="73" rx="8" ry="4" fill="#ff4d4d" opacity="0.38"/>
+    `;
+  } else if(mood === "sad"){
+    brows = `
+      <path d="M60 55 Q67 49 74 53" stroke="#222" stroke-width="2.5" fill="none"/>
+      <path d="M100 55 Q93 49 86 53" stroke="#222" stroke-width="2.5" fill="none"/>
+    `;
+    eyes = `
+      <circle cx="67" cy="63" r="4" fill="#111"/>
+      <circle cx="93" cy="63" r="4" fill="#111"/>
+    `;
+  } else if(mood === "smug"){
+    brows = `
+      <path d="M59 53 Q66 52 73 53" stroke="#222" stroke-width="2.5" fill="none"/>
+      <path d="M85 45 Q93 41 101 46" stroke="#222" stroke-width="2.8" fill="none"/>
+    `;
+    eyes = `
+      <path d="M62 61 Q67 58 72 61" stroke="#222" stroke-width="2.5" fill="none"/>
+      <circle cx="67" cy="62" r="2.5" fill="#111"/>
+      <path d="M88 61 Q93 58 98 61" stroke="#222" stroke-width="2.5" fill="none"/>
+      <circle cx="93" cy="62" r="2.5" fill="#111"/>
+    `;
+  } else {
+    // Neutral
+    brows = `
+      <path d="M60 52 Q68 50 74 52" stroke="#222" stroke-width="2.5" fill="none"/>
+      <path d="M86 52 Q92 50 100 52" stroke="#222" stroke-width="2.5" fill="none"/>
+    `;
+    eyes = `
+      <circle cx="67" cy="62" r="4.2" fill="#111"/>
+      <circle cx="93" cy="62" r="4.2" fill="#111"/>
+      <circle cx="68.5" cy="60.5" r="1.3" fill="#fff"/>
+      <circle cx="94.5" cy="60.5" r="1.3" fill="#fff"/>
+    `;
+  }
+
+  // Mouth
+  let mouth = "";
+  if(mouthOpen){
+    mouth = `<ellipse cx="80" cy="85" rx="7" ry="5" fill="#2d1313"/><path d="M75 83 Q80 85 85 83" stroke="#fff" stroke-width="1.5" fill="none"/>`;
+  } else {
+    if(mood === "smug"){
+      mouth = `<path d="M74 85 Q79 86 87 81" stroke="#2d1313" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+    } else if(mood === "sad"){
+      mouth = `<path d="M74 87 Q80 82 86 87" stroke="#2d1313" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+    } else if(mood === "angry"){
+      mouth = `<line x1="74" y1="85" x2="86" y2="85" stroke="#2d1313" stroke-width="2.5" stroke-linecap="round"/>`;
+    } else if(mood === "nervous"){
+      mouth = `<path d="M74 85 Q77 87 80 85 Q83 83 86 85" stroke="#2d1313" stroke-width="2.2" fill="none"/>`;
+    } else {
+      mouth = `<path d="M74 85 Q80 87 86 85" stroke="#2d1313" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+    }
+  }
+
+  // Hair style
+  let hairSvg = "";
+  if(look.hairStyle === "short"){
+    hairSvg = `<path d="M52 64 C50 36 60 26 80 26 C100 26 110 36 108 64 C104 46 95 38 80 38 C65 38 56 46 52 64 Z" fill="${hair}"/>`;
+  } else if(look.hairStyle === "long"){
+    hairSvg = `
+      <path d="M50 70 C48 30 60 22 80 22 C100 22 112 30 110 70 L118 140 L104 140 L105 75 L55 75 L56 140 L42 140 Z" fill="${hair}"/>
+    `;
+  } else if(look.hairStyle === "bun"){
+    hairSvg = `
+      <circle cx="80" cy="18" r="16" fill="${hair}"/>
+      <path d="M52 64 C50 36 60 26 80 26 C100 26 110 36 108 64 C104 42 92 34 80 34 C68 34 56 42 52 64 Z" fill="${hair}"/>
+    `;
+  } else if(look.hairStyle === "curly"){
+    hairSvg = `
+      <circle cx="60" cy="40" r="14" fill="${hair}"/><circle cx="75" cy="30" r="14" fill="${hair}"/>
+      <circle cx="90" cy="32" r="14" fill="${hair}"/><circle cx="102" cy="44" r="14" fill="${hair}"/>
+      <circle cx="50" cy="56" r="12" fill="${hair}"/><circle cx="110" cy="58" r="12" fill="${hair}"/>
+      <path d="M52 64 C50 36 60 28 80 28 C100 28 110 36 108 64 Z" fill="${hair}"/>
+    `;
+  } else if(look.hairStyle === "cap"){
+    hairSvg = `
+      <ellipse cx="80" cy="42" rx="42" ry="14" fill="#2d3748"/>
+      <path d="M50 42 C50 24 110 24 110 42 Z" fill="#2d3748"/>
+      <polygon points="52,44 108,44 118,50 42,50" fill="#1a202c"/>
+    `;
+  } else {
+    // Bald
+    hairSvg = `<path d="M50 68 C50 56 52 46 54 42 C52 52 52 62 50 68 Z" fill="${hair}"/>`;
+  }
+
+  // Accessories
+  let accSvg = "";
+  if(look.accessory === "glasses"){
+    accSvg = `
+      <circle cx="67" cy="62" r="10" stroke="#f1c40f" stroke-width="2.2" fill="none"/>
+      <circle cx="93" cy="62" r="10" stroke="#f1c40f" stroke-width="2.2" fill="none"/>
+      <line x1="77" y1="62" x2="83" y2="62" stroke="#f1c40f" stroke-width="2.2"/>
+    `;
+  } else if(look.accessory === "hat"){
+    accSvg = `
+      <ellipse cx="80" cy="32" rx="44" ry="10" fill="#202028"/>
+      <path d="M54 32 C54 12 106 12 106 32 Z" fill="#202028"/>
+      <rect x="54" y="27" width="52" height="5" fill="${look.outfitColor || '#b06ecf'}"/>
+    `;
+  } else if(look.accessory === "scarf"){
+    accSvg = `
+      <path d="M60 102 Q80 114 100 102 L108 132 L92 134 L80 112 L68 134 L52 132 Z" fill="#e74c3c"/>
+    `;
+  } else if(look.accessory === "mustache"){
+    accSvg = `
+      <path d="M68 76 Q76 72 80 77 Q84 72 92 76 Q85 82 80 79 Q75 82 68 76 Z" fill="${hair}"/>
+    `;
+  } else if(look.accessory === "earrings"){
+    accSvg = `
+      <circle cx="48" cy="74" r="3.5" fill="#ffd700"/><circle cx="112" cy="74" r="3.5" fill="#ffd700"/>
+    `;
+  }
+
+  // Handcuffs
+  let cuffs = "";
+  if(handcuffed){
+    cuffs = `
+      <rect x="52" y="174" width="22" height="12" rx="3" fill="#bdc3c7" stroke="#2c3e50" stroke-width="2"/>
+      <rect x="86" y="174" width="22" height="12" rx="3" fill="#bdc3c7" stroke="#2c3e50" stroke-width="2"/>
+      <line x1="74" y1="180" x2="86" y2="180" stroke="#7f8c8d" stroke-width="3" stroke-dasharray="2 2"/>
+    `;
+  }
+
+  return `
+    <g>
+      <!-- Neck -->
+      <rect x="73" y="85" width="14" height="24" fill="${skin}"/>
+      <!-- Body & Shoulders -->
+      <path d="M30 195 L46 102 Q80 88 114 102 L130 195 Z" fill="${outfit}"/>
+      <polygon points="80,102 70,132 90,132" fill="#fff"/>
+      <polygon points="80,114 77,160 83,160" fill="#222"/>
+      <!-- Head & Ears -->
+      <circle cx="48" cy="68" r="6" fill="${skin}"/>
+      <circle cx="112" cy="68" r="6" fill="${skin}"/>
+      <ellipse cx="80" cy="65" rx="29" ry="33" fill="${skin}"/>
+      <!-- Hair -->
+      ${hairSvg}
+      <!-- Expressions -->
+      ${brows}
+      ${eyes}
+      ${blush}
+      ${sweat}
+      <path d="M78 66 Q82 72 77 75 L83 75" stroke="#333" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      ${mouth}
+      <!-- Accessories -->
+      ${accSvg}
+      ${cuffs}
+    </g>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════
+   7. DIALOGUE & TYPEWRITER ENGINE
+═══════════════════════════════════════════════════ */
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function runTypewriter(text, onChar, onDone){
+  state.twAbort = false;
+  if(!FX.animations){
+    onDone(text);
+    return;
+  }
+  let current = "";
+  for(let i=0; i<text.length; i++){
+    if(state.twAbort){
+      onDone(text);
+      return;
+    }
+    current += text[i];
+    onChar(current, i);
+    if(i % 2 === 0 && FX.sound) playTypeBlip();
+    await sleep(20);
+  }
+  onDone(text);
+}
+
+function startMouthAnimation(suspectSlotId){
+  stopMouthAnimation();
+  let open = false;
+  state.mouthTimer = setInterval(()=>{
+    open = !open;
+    updateSlotMouth(suspectSlotId, open);
+  }, 120);
+}
+
+function stopMouthAnimation(){
+  if(state.mouthTimer){
+    clearInterval(state.mouthTimer);
+    state.mouthTimer = null;
+  }
+  if(state.caseData && state.caseData.suspects){
+    state.caseData.suspects.forEach(s => updateSlotMouth(s.id, false));
+  }
+  updateDetectiveMouth(false);
+}
+
+function updateSlotMouth(suspectId, mouthOpen){
+  const el = document.getElementById("avatar-graphic-" + suspectId);
+  if(!el || !state.caseData) return;
+  const s = state.caseData.suspects.find(x => x.id === suspectId);
+  if(!s) return;
+  const mood = state.suspectMoods[suspectId] || "neutral";
+  el.innerHTML = drawAvatar(s.look, mood, false, mouthOpen);
+}
+
+function updateDetectiveMouth(mouthOpen){
+  const el = document.getElementById("avatar-graphic-detective");
+  if(!el) return;
+  el.innerHTML = drawAvatar({}, "neutral", true, mouthOpen);
+}
+
+/* ═══════════════════════════════════════════════════
+   8. FX LAYER (PARTICLES & AUDIO)
+═══════════════════════════════════════════════════ */
+let fxCanvas, fxCtx, fxParticles = [], fxAnimId = null, fxMode = "none";
+
+function initFXCanvas(){
+  fxCanvas = document.getElementById("stage-canvas");
+  if(!fxCanvas) return;
+  fxCtx = fxCanvas.getContext("2d");
+  window.addEventListener("resize", resizeFX);
+  resizeFX();
+  startFXLoop();
+}
+
+function resizeFX(){
+  if(!fxCanvas) return;
+  fxCanvas.width = 1280;
+  fxCanvas.height = 720;
+}
+
+function setFXMode(mode){
+  fxMode = mode;
+  fxParticles = [];
+  if(mode === "rain"){
+    for(let i=0; i<110; i++){
+      fxParticles.push({
+        x: Math.random() * 1280,
+        y: Math.random() * 720,
+        len: Math.random() * 16 + 10,
+        speed: Math.random() * 5 + 8,
+        op: Math.random() * 0.4 + 0.15
+      });
+    }
+  } else if(mode === "confetti"){
+    const colors = ["#e74c3c","#f1c40f","#2ecc71","#3498db","#9b59b6","#e67e22"];
+    for(let i=0; i<90; i++){
+      fxParticles.push({
+        x: Math.random() * 1280,
+        y: Math.random() * -300,
+        w: Math.random() * 10 + 6,
+        h: Math.random() * 8 + 5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vx: (Math.random() - 0.5) * 3,
+        vy: Math.random() * 3 + 2.5,
+        rot: Math.random() * 360,
+        vrot: (Math.random() - 0.5) * 6
+      });
+    }
+  }
+}
+
+function startFXLoop(){
+  if(fxAnimId) cancelAnimationFrame(fxAnimId);
+  function loop(){
+    if(!document.hidden && FX.particles && fxCtx){
+      fxCtx.clearRect(0,0,1280,720);
+      if(fxMode === "rain"){
+        fxCtx.strokeStyle = "#9bbcd8";
+        fxCtx.lineWidth = 1.2;
+        fxParticles.forEach(p => {
+          fxCtx.globalAlpha = p.op;
+          fxCtx.beginPath();
+          fxCtx.moveTo(p.x, p.y);
+          fxCtx.lineTo(p.x - 2, p.y + p.len);
+          fxCtx.stroke();
+          p.y += p.speed;
+          p.x -= 0.6;
+          if(p.y > 720){ p.y = -20; p.x = Math.random() * 1280; }
+        });
+        fxCtx.globalAlpha = 1;
+      } else if(fxMode === "confetti"){
+        fxParticles.forEach(p => {
+          fxCtx.save();
+          fxCtx.translate(p.x, p.y);
+          fxCtx.rotate((p.rot * Math.PI) / 180);
+          fxCtx.fillStyle = p.color;
+          fxCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          fxCtx.restore();
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.vrot;
+          if(p.y > 720){ p.y = -20; p.x = Math.random() * 1280; }
+        });
+      }
+    }
+    fxAnimId = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+// WebAudio Sound Synthesis
+let audioCtx = null;
+function getAudioCtx(){
+  if(!FX.sound) return null;
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }catch{ return null; }
+}
+
+function playTypeBlip(){
+  const ctx = getAudioCtx(); if(!ctx) return;
+  try{
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(550 + Math.random()*240, ctx.currentTime);
+    g.gain.setValueAtTime(0.025, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.035);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.035);
+  }catch{}
+}
+
+function playPinSound(){
+  const ctx = getAudioCtx(); if(!ctx) return;
+  try{
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(340, ctx.currentTime);
+    g.gain.setValueAtTime(0.07, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.07);
+  }catch{}
+}
+
+function playWinChime(){
+  const ctx = getAudioCtx(); if(!ctx) return;
+  try{
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      const st = ctx.currentTime + i * 0.12;
+      osc.frequency.setValueAtTime(freq, st);
+      g.gain.setValueAtTime(0.1, st);
+      g.gain.exponentialRampToValueAtTime(0.001, st + 0.45);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(st); osc.stop(st + 0.45);
+    });
+  }catch{}
+}
+
+function playLoseTone(){
+  const ctx = getAudioCtx(); if(!ctx) return;
+  try{
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(140, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(75, ctx.currentTime + 0.85);
+    g.gain.setValueAtTime(0.12, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.85);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.85);
+  }catch{}
+}
+
+// Storm lightning flash timer
+let stormTimer = null;
+function startStormLightning(){
+  stopStormLightning();
+  if(!state.caseData || state.caseData.visual.weather !== "storm") return;
+  function scheduleNext(){
+    const delay = Math.random() * 6000 + 6000;
+    stormTimer = setTimeout(()=>{
+      triggerLightningFlash();
+      scheduleNext();
+    }, delay);
+  }
+  scheduleNext();
+}
+
+function stopStormLightning(){
+  if(stormTimer){ clearTimeout(stormTimer); stormTimer = null; }
+}
+
+function triggerLightningFlash(){
+  const fl = document.getElementById("lightning-flash");
+  if(!fl) return;
+  fl.style.opacity = "0.85";
+  setTimeout(()=>fl.style.opacity="0", 80);
+  setTimeout(()=>{
+    fl.style.opacity = "0.4";
+    setTimeout(()=>fl.style.opacity="0", 60);
+  }, 140);
+}
+
+/* ═══════════════════════════════════════════════════
+   9. HUD & UI MANAGEMENT
+═══════════════════════════════════════════════════ */
+function setScreen(s){
+  ["start","game","end"].forEach(n => document.getElementById(n+"-screen").classList.toggle("hidden", n !== s));
+  state.screen = s;
+}
+
+function renderHUD(){
+  const track = document.getElementById("q-hud-icons");
+  track.innerHTML = "";
+  for(let i=0; i<MAX_Q; i++){
+    const span = document.createElement("span");
+    span.className = "q-icon" + (i >= state.questionsLeft ? " used" : "");
+    span.textContent = "🔍";
+    track.appendChild(span);
+  }
+}
+
+function showError(msg){
+  document.getElementById("error-msg").textContent = msg;
+  document.getElementById("error-banner").classList.remove("hidden");
+  document.getElementById("static-overlay").classList.add("active");
+  setTimeout(()=>document.getElementById("static-overlay").classList.remove("active"), 1200);
+}
+
+function hideError(){
+  document.getElementById("error-banner").classList.add("hidden");
+  document.getElementById("static-overlay").classList.remove("active");
+}
+
+function setInline(msg){ document.getElementById("inline-msg").textContent = msg; }
+
+function formatDisplayName(fullName){
+  if(!fullName) return "Suspect";
+  const parts = fullName.trim().split(/\s+/);
+  if(parts.length <= 1) return parts[0];
+  const titles = ["Mr.","Mrs.","Ms.","Miss","Dr.","Lady","Lord","Sir","Prof.","Madame","Master","Count","Countess","Baron","Baroness","Inspector","Detective"];
+  if(titles.includes(parts[0]) && parts.length >= 2){
+    return parts[0] + " " + parts[parts.length - 1];
+  }
+  if(parts.length === 2) return parts.join(" ");
+  return parts.slice(0, 2).join(" ");
+}
+
+/* ═══════════════════════════════════════════════════
+   10. STAGE RENDERING & LINEUP (BUG-FREE POSITIONS)
+═══════════════════════════════════════════════════ */
+function renderStage(){
+  const svg = document.getElementById("stage-svg");
+  const cd = state.caseData;
+  if(!svg || !cd) return;
+
+  const sceneHtml = drawScene(cd.visual, cd.title);
+
+  // Lineup positions: detective on left (110), suspects at 420, 620, 820, 1020
+  const suspectSlots = cd.suspects.map((s, i)=>{
+    const x = 420 + i * 200;
+    const y = 325;
+    const color = CHAR_COLORS[i];
+    const isSelected = s.id === state.selectedId;
+    const mood = state.suspectMoods[s.id] || "neutral";
+
+    return `
+      <!-- Suspect Slot ${s.id} (Parent holds transform) -->
+      <g id="slot-${s.id}" class="suspect-slot ${isSelected?'selected':''}" data-id="${s.id}" transform="translate(${x}, ${isSelected ? y - 15 : y}) ${isSelected ? 'scale(1.08)' : 'scale(1)'}" style="--slot-color:${color}">
+        <!-- Inner bob wrap carries CSS animation, keeping parent X/Y fixed -->
+        <g class="avatar-bob-wrap bob-${i}">
+          <!-- Overhead Spotlight -->
+          <polygon id="spotlight-${s.id}" points="80,-310 -15,220 175,220" fill="url(#spotlightGrad)" opacity="${isSelected?'1':'0'}" style="transition:opacity .35s ease"/>
+          <!-- Pedestal Ring -->
+          <ellipse id="ring-${s.id}" cx="80" cy="204" rx="52" ry="12" fill="none" stroke="${color}" stroke-width="2.5" opacity="${isSelected?'0.9':'0'}" style="transition:opacity .35s ease"/>
+          <!-- Shadow -->
+          <ellipse cx="80" cy="204" rx="46" ry="10" fill="#000" opacity=".6"/>
+          <!-- Avatar Graphic -->
+          <g id="avatar-graphic-${s.id}">
+            ${drawAvatar(s.look, mood, false, false)}
+          </g>
+          <!-- Nameplate -->
+          <rect x="10" y="210" width="140" height="26" rx="6" fill="#0f111e" stroke="${isSelected?color:'#2a2d48'}" stroke-width="${isSelected?2:1}"/>
+          <text x="80" y="227" fill="${color}" font-size="12" font-weight="900" text-anchor="middle">${formatDisplayName(s.name)}</text>
+          <!-- Overhead Thought Bubble for AI waiting -->
+          <g id="thought-${s.id}" class="hidden" transform="translate(45, -45)">
+            <ellipse cx="35" cy="20" rx="32" ry="18" fill="#fff" opacity=".95"/>
+            <circle cx="20" cy="40" r="5" fill="#fff" opacity=".9"/>
+            <circle cx="12" cy="48" r="3" fill="#fff" opacity=".8"/>
+            <circle cx="23" cy="20" r="3" fill="#333"/>
+            <circle cx="35" cy="20" r="3" fill="#333"/>
+            <circle cx="47" cy="20" r="3" fill="#333"/>
+          </g>
+        </g>
+      </g>
+    `;
+  }).join("");
+
+  const detectiveSlot = `
+    <!-- Detective Slot (Left Foreground) -->
+    <g id="slot-detective" transform="translate(110, 285) scale(1.22)">
+      <g class="avatar-bob-wrap bob-det">
+        <ellipse cx="80" cy="204" rx="48" ry="11" fill="#000" opacity=".65"/>
+        <g id="avatar-graphic-detective">
+          ${drawAvatar({}, "neutral", true, false)}
+        </g>
+        <rect x="22" y="210" width="116" height="24" rx="5" fill="#121324" stroke="#c8a84b" stroke-width="1.5"/>
+        <text x="80" y="226" fill="#c8a84b" font-size="12" font-weight="900" text-anchor="middle">Detective</text>
+        <!-- Detective speech bubble on stage -->
+        <g id="det-stage-bubble" class="hidden" transform="translate(-10, -70)">
+          <rect x="0" y="0" width="230" height="60" rx="8" fill="#141c2b" stroke="#7a5af8" stroke-width="2"/>
+          <polygon points="40,60 50,75 60,60" fill="#141c2b"/>
+          <text id="det-stage-bubble-txt" x="12" y="32" fill="#bde0ff" font-size="11" font-weight="700" width="205"></text>
+        </g>
+      </g>
+    </g>
+  `;
+
+  svg.innerHTML = `
+    ${sceneHtml}
+    <g id="lineup-group">
+      ${detectiveSlot}
+      ${suspectSlots}
+    </g>
+  `;
+
+  // Attach click events on slots
+  cd.suspects.forEach(s => {
+    const slot = document.getElementById("slot-" + s.id);
+    if(slot) slot.addEventListener("click", () => selectSuspect(s.id));
+  });
+
+  // Weather FX mode
+  if(cd.visual.weather === "rain" || cd.visual.weather === "storm"){
+    setFXMode("rain");
+    if(cd.visual.weather === "storm") startStormLightning();
+  } else {
+    setFXMode("none");
+    stopStormLightning();
+  }
+
+  // Render bottom quick roster
+  renderQuickRoster();
+}
+
+function selectSuspect(id){
+  if(state.selectedId === id) return;
+  state.selectedId = id;
+  state.twAbort = true;
+  stopMouthAnimation();
+
+  const cd = state.caseData;
+  if(!cd) return;
+  const s = cd.suspects.find(x => x.id === id);
+  const sIdx = cd.suspects.findIndex(x => x.id === id);
+
+  // Update SVG highlights
+  cd.suspects.forEach((item, idx) => {
+    const slot = document.getElementById("slot-" + item.id);
+    const spot = document.getElementById("spotlight-" + item.id);
+    const ring = document.getElementById("ring-" + item.id);
+    const isSel = item.id === id;
+    const baseX = 420 + idx * 200;
+    const baseY = 325;
+
+    if(slot){
+      slot.classList.toggle("selected", isSel);
+      slot.classList.toggle("dimmed", !isSel);
+      slot.setAttribute("transform", isSel ? `translate(${baseX}, ${baseY - 15}) scale(1.08)` : `translate(${baseX}, ${baseY}) scale(1)`);
+    }
+    if(spot) spot.setAttribute("opacity", isSel ? "1" : "0");
+    if(ring) ring.setAttribute("opacity", isSel ? "0.9" : "0");
+  });
+
+  // Update dialogue speaker info
+  const spkBadge = document.getElementById("dialogue-speaker-badge");
+  spkBadge.textContent = "👤 " + s.name;
+  spkBadge.style.color = CHAR_COLORS[sIdx];
+  spkBadge.style.borderColor = CHAR_COLORS[sIdx];
+
+  const moodTag = document.getElementById("dialogue-mood-tag");
+  const curMood = state.suspectMoods[id] || "neutral";
+  moodTag.textContent = "Mood: " + curMood.toUpperCase();
+
+  // Update input placeholder
+  document.getElementById("question-input").placeholder = `Interrogate ${s.name} (${s.role})…`;
+
+  // Update quick roster selection
+  renderQuickRoster();
+
+  // Load latest statement
+  const history = state.chats[id] || [];
+  if(history.length === 0){
+    document.getElementById("dialogue-text-box").textContent = `Interrogating ${s.name} — ${s.role}. What would you like to ask?`;
+  } else {
+    const last = history[history.length - 1];
+    document.getElementById("dialogue-text-box").textContent = last.text;
+  }
+}
+
+function renderQuickRoster(){
+  const grid = document.getElementById("roster-grid");
+  if(!grid || !state.caseData) return;
+  grid.innerHTML = "";
+
+  state.caseData.suspects.forEach((s, idx) => {
+    const card = document.createElement("div");
+    card.className = "roster-card" + (s.id === state.selectedId ? " active" : "");
+    card.innerHTML = `
+      <div class="roster-thumb">
+        <svg viewBox="0 0 160 220" width="100%" height="100%">
+          ${drawAvatar(s.look, state.suspectMoods[s.id] || "neutral", false, false)}
+        </svg>
+      </div>
+      <div class="roster-name" style="color:${CHAR_COLORS[idx]}">${formatDisplayName(s.name)}</div>
+    `;
+    card.addEventListener("click", () => selectSuspect(s.id));
+    grid.appendChild(card);
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   11. EVIDENCE BOARD & FILTERING
+═══════════════════════════════════════════════════ */
+function addEvidence(suspectId, question, reply, mood="neutral"){
+  const cd = state.caseData;
+  const s = cd.suspects.find(x => x.id === suspectId);
+  const sIdx = cd.suspects.findIndex(x => x.id === suspectId);
+  const card = {
+    id: "clue-" + (state.notebook.length + 1),
+    suspectId,
+    name: s ? s.name : "Suspect",
+    role: s ? s.role : "",
+    color: CHAR_COLORS[sIdx] || "#d4a030",
+    look: s ? s.look : {},
+    q: question,
+    a: reply,
+    mood,
+    turn: state.notebook.length + 1
+  };
+  state.notebook.push(card);
+  renderEvidence();
+  playPinSound();
+}
+
+function renderEvidence(){
+  const list = document.getElementById("evidence-list");
+  const countBadge = document.getElementById("ev-count-badge");
+  countBadge.textContent = `${state.notebook.length} / 8 clues`;
+
+  // Filter cards
+  const filtered = state.filterId && state.filterId !== "all"
+    ? state.notebook.filter(c => c.suspectId === state.filterId)
+    : state.notebook;
+
+  if(filtered.length === 0){
+    list.innerHTML = `
+      <div id="evidence-empty">
+        <span style="font-size:2rem;opacity:.5">📁</span>
+        <span>${state.notebook.length === 0 ? "No testimony recorded yet.<br>Select a suspect and ask questions." : "No clues found for this suspect."}</span>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = "";
+  filtered.forEach(c => {
+    const el = document.createElement("div");
+    el.className = "ev-card";
+    el.style.borderLeftColor = c.color;
+
+    el.innerHTML = `
+      <span class="ev-card-pin">📌</span>
+      <div class="ev-card-author" style="color:${c.color}">
+        <span>${c.name}</span>
+        <span style="font-size:.68rem;opacity:.8;font-weight:700">CLUE #${c.turn}</span>
+      </div>
+      <div class="ev-card-q">"${c.q}"</div>
+      <div class="ev-card-a">${c.a}</div>
+      <div style="font-size:.68rem;margin-top:.35rem;font-weight:700;color:#6b5329;text-transform:uppercase">Observed Mood: ${c.mood}</div>
+    `;
+    list.appendChild(el);
+  });
+  list.scrollTop = list.scrollHeight;
+}
+
+// Filter Tabs Click
+document.querySelectorAll(".ev-filter-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".ev-filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.filterId = btn.dataset.filter;
+    renderEvidence();
+  });
+});
+
+/* ═══════════════════════════════════════════════════
+   12. INTERROGATION & ASK FLOW
+═══════════════════════════════════════════════════ */
+async function submitQuestion(){
+  if(!state.selectedId){ setInline("Please select a suspect in the lineup first."); return; }
+  if(state.questionsLeft <= 0){ setInline("Out of questions — deliver your accusation!"); return; }
+
+  const ta = document.getElementById("question-input");
+  let q = ta.value;
+  if(!q.trim()){ setInline("Please type an interrogation question."); return; }
+  if(q.length > 300){ q = q.slice(0,300); ta.value = q; setInline("Trimmed to 300 characters."); }
+  else setInline("");
+
+  state.twAbort = true;
+  stopMouthAnimation();
+
+  const sid = state.selectedId;
+  const sIdx = state.caseData.suspects.findIndex(s => s.id === sid);
+  const suspect = state.caseData.suspects[sIdx];
+
+  // 1. Show typed question in detective speech bubble
+  const detBubble = document.getElementById("det-stage-bubble");
+  const detTxt = document.getElementById("det-stage-bubble-txt");
+  if(detBubble && detTxt){
+    detTxt.textContent = q.length > 55 ? q.slice(0, 52) + "…" : q;
+    detBubble.classList.remove("hidden");
+  }
+  updateDetectiveMouth(true);
+  setTimeout(()=>updateDetectiveMouth(false), 550);
+  setTimeout(()=>detBubble && detBubble.classList.add("hidden"), 3000);
+
+  // Consume question HUD
+  state.questionsLeft--;
+  renderHUD();
+  ta.value = "";
+  setBusy(true);
+
+  // 2. Show thought bubble above suspect while thinking
+  const thought = document.getElementById("thought-" + sid);
+  if(thought) thought.classList.remove("hidden");
+
+  // Save player question to history
+  if(!state.chats[sid]) state.chats[sid] = [];
+  state.chats[sid].push({ role: "player", text: q });
+
+  /* Offline reply */
+  if(state.isOffline){
+    await sleep(400);
+    if(thought) thought.classList.add("hidden");
+    const repArr = OFFLINE_REPLIES[sid] || ["I have nothing to say to that."];
+    const canned = repArr[Math.floor(Math.random() * repArr.length)];
+    const moods = ["neutral","nervous","angry","sad","smug"];
+    const rndMood = moods[Math.floor(Math.random() * moods.length)];
+    state.suspectMoods[sid] = rndMood;
+    updateSlotMouth(sid, false);
+    document.getElementById("dialogue-mood-tag").textContent = "Mood: " + rndMood.toUpperCase();
+
+    state.chats[sid].push({ role: "npc", text: canned, mood: rndMood });
+    addEvidence(sid, q, canned, rndMood);
+    await streamReply(sid, canned);
+    setBusy(false);
+    return;
+  }
+
+  /* Generative AI reply */
+  try{
+    const history = state.chats[sid];
+    const geminiP = dialoguePrompt(suspect, q, history);
+    const localP  = dialoguePromptLocal(suspect, q, history);
+    const rawReply = await callAI(geminiP, false, localP);
+
+    if(thought) thought.classList.add("hidden");
+    const { text, mood } = parseMood(rawReply);
+    state.suspectMoods[sid] = mood;
+    updateSlotMouth(sid, false);
+    document.getElementById("dialogue-mood-tag").textContent = "Mood: " + mood.toUpperCase();
+
+    state.chats[sid].push({ role: "npc", text, mood });
+    addEvidence(sid, q, text, mood);
+    await streamReply(sid, text);
+  }catch(e){
+    if(thought) thought.classList.add("hidden");
+    state.chats[sid].pop();
+    state.questionsLeft++;
+    renderHUD();
+    showError("Interrogation failed: " + e.message);
+  }finally{
+    setBusy(false);
+    stopMouthAnimation();
+  }
+}
+
+async function streamReply(suspectId, fullText){
+  const box = document.getElementById("dialogue-text-box");
+  box.textContent = "";
+  startMouthAnimation(suspectId);
+
+  await runTypewriter(
+    fullText,
+    (current) => { box.textContent = current; },
+    (finalText) => {
+      box.textContent = finalText;
+      stopMouthAnimation();
+    }
+  );
+}
+
+function setBusy(b){
+  document.getElementById("ask-btn").disabled = b;
+  document.getElementById("question-input").disabled = b;
+  document.getElementById("accuse-trigger-btn").disabled = b;
+}
+
+/* ═══════════════════════════════════════════════════
+   13. ACCUSATION & DRAMATIC ENDING
+═══════════════════════════════════════════════════ */
+function openAccuseModal(){
+  if(!state.selectedId){ setInline("Select a suspect in the lineup to accuse."); return; }
+  const s = state.caseData.suspects.find(x => x.id === state.selectedId);
+  document.getElementById("accuse-modal-title").textContent = `Accuse ${s.name}?`;
+  document.getElementById("accuse-avatar-preview").innerHTML = `
+    <svg viewBox="0 0 160 220" width="100%" height="100%">
+      ${drawAvatar(s.look, "nervous", false, false)}
+    </svg>
+  `;
+  document.getElementById("accuse-modal").classList.remove("hidden");
+}
+
+function closeAccuseModal(){
+  document.getElementById("accuse-modal").classList.add("hidden");
+}
+
+async function confirmAccusation(){
+  closeAccuseModal();
+  state.twAbort = true;
+  stopMouthAnimation();
+
+  const sid = state.selectedId;
+  const cd = state.caseData;
+  const won = sid === cd.culpritId;
+  const culprit = cd.suspects.find(s => s.id === cd.culpritId);
+  const accused = cd.suspects.find(s => s.id === sid);
+
+  // 1. Stage lights dim, center spotlight on accused
+  const vig = document.getElementById("stage-vignette");
+  if(vig) vig.style.opacity = "1";
+  setBusy(true);
+
+  // Move accused slot to stage center
+  const accusedSlot = document.getElementById("slot-" + sid);
+  if(accusedSlot){
+    accusedSlot.setAttribute("transform", "translate(580, 290) scale(1.3)");
+    accusedSlot.classList.add("selected");
+  }
+
+  // 1.5s dramatic suspension drumroll pause
+  await sleep(1500);
+
+  // 2. Verdict Reveal
+  if(won){
+    playWinChime();
+    setFXMode("confetti");
+    const av = document.getElementById("avatar-graphic-" + sid);
+    if(av) av.innerHTML = drawAvatar(culprit.look, "sad", false, false, true);
+  } else {
+    playLoseTone();
+    state.suspectMoods[cd.culpritId] = "smug";
+    const killerSlot = document.getElementById("slot-" + cd.culpritId);
+    if(killerSlot){
+      killerSlot.setAttribute("transform", "translate(420, 305) scale(1.15)");
+      const kAv = document.getElementById("avatar-graphic-" + cd.culpritId);
+      if(kAv) kAv.innerHTML = drawAvatar(culprit.look, "smug", false, false, false);
+    }
+  }
+
+  await sleep(1800);
+
+  // 3. Transition to Noir Gazette Screen
+  flashTransition(()=>{
+    setScreen("end");
+    const stamp = document.getElementById("verdict-stamp");
+    stamp.textContent = won ? "CASE CLOSED — SOLVED" : "THE KILLER ESCAPED";
+    stamp.className = won ? "stamp-win" : "stamp-lose";
+
+    document.getElementById("paper-headline").textContent = cd.title;
+    document.getElementById("paper-culprit-name").textContent = `${culprit.name} (${culprit.role})`;
+    document.getElementById("paper-culprit-svg").innerHTML = `
+      <svg viewBox="0 0 160 220" width="100%" height="100%">
+        ${drawAvatar(culprit.look, won ? "sad" : "smug", false, false, won)}
+      </svg>
+    `;
+    document.getElementById("paper-truth").textContent = cd.truth;
+    document.getElementById("paper-epilogue").textContent = "Writing official closing report…";
+  });
+
+  // Epilogue text
+  if(state.isOffline){
+    await sleep(300);
+    typewriterBox(document.getElementById("paper-epilogue"), OFFLINE_EPILOGUE);
+    return;
+  }
+
+  const epFull = `You are a noir narrator. Detective ${won?"correctly":"incorrectly"} accused ${accused.name}. Real killer is ${culprit.name}. Truth: ${cd.truth}. Write a 3-sentence atmospheric epilogue in plain text.`;
+  const epLocal = epiloguePromptLocal(won, accused.name, culprit.name);
+  try{
+    const text = await callAI(epFull, false, epLocal);
+    typewriterBox(document.getElementById("paper-epilogue"), text);
+  }catch{
+    const fallback = won
+      ? `${culprit.name} was handcuffed before dawn, the evidence overwhelming. Justice had arrived at last.`
+      : `The charges against ${accused.name} crumbled by morning. The real killer, ${culprit.name}, vanished into the mist.`;
+    typewriterBox(document.getElementById("paper-epilogue"), fallback);
+  }
+}
+
+async function typewriterBox(el, text){
+  el.textContent = "";
+  for(let i=0; i<text.length; i++){
+    el.textContent += text[i];
+    await sleep(18);
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   14. GAME LIFECYCLE & EVENTS
+═══════════════════════════════════════════════════ */
+function resetState(){
+  state.isOffline = false;
+  state.caseData = null;
+  state.selectedId = null;
+  state.chats = {};
+  state.notebook = [];
+  state.questionsLeft = MAX_Q;
+  state.lastQ = null;
+  state.pendingAccuse = null;
+  state.twAbort = false;
+  state.suspectMoods = {};
+  state.filterId = "all";
+  stopMouthAnimation();
+  stopStormLightning();
+  setFXMode("none");
+}
+
+function flashTransition(cb){
+  const fl = document.getElementById("screen-flash");
+  fl.style.opacity = "0.75";
+  setTimeout(()=>{
+    if(cb) cb();
+    fl.style.opacity = "0";
+  }, 160);
+}
+
+async function launchGame(cd){
+  sanitizeVisual(cd);
+  state.caseData = cd;
+
+  document.getElementById("case-title-txt").textContent = cd.title;
+  document.getElementById("case-meta-txt").textContent = `${cd.setting} · Victim: ${cd.victim}`;
+  document.getElementById("dossier-summary").textContent = cd.summary;
+
+  // Update filter buttons labels with suspect names
+  const filterBtns = document.querySelectorAll(".ev-filter-btn");
+  if(filterBtns.length >= 5){
+    filterBtns[1].textContent = formatDisplayName(cd.suspects[0].name);
+    filterBtns[2].textContent = formatDisplayName(cd.suspects[1].name);
+    filterBtns[3].textContent = formatDisplayName(cd.suspects[2].name);
+    filterBtns[4].textContent = formatDisplayName(cd.suspects[3].name);
+  }
+
+  renderHUD();
+  renderStage();
+  renderEvidence();
+  hideError();
+  setInline("");
+
+  // Show dossier modal first
+  document.getElementById("dossier-modal").classList.remove("hidden");
+  flashTransition(()=>setScreen("game"));
+}
+
+async function startAICase(theme){
+  const errDiv = document.getElementById("start-error");
+  errDiv.textContent = "";
+  const btn = document.getElementById("new-case-btn");
+  btn.disabled = true; btn.textContent = "⏳ Generating Mystery Case…";
+
+  const geminiP = casePrompt(theme);
+  const localP  = casePromptLocal(theme);
+  let cd = null;
+
+  try{
+    const raw = await callAI(geminiP, true, localP);
+    if(validateCase(raw)) cd = raw;
+  }catch(e){
+    if(e.message.includes("401/403")){ errDiv.textContent = e.message; return; }
+    errDiv.textContent = e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = "🎲 Generate AI Mystery Case";
+  }
+
+  if(!cd){
+    try{
+      const raw2 = await callAI(geminiP, true, localP);
+      if(validateCase(raw2)) cd = raw2;
+    }catch{}
+  }
+
+  if(!cd){
+    if(state.activeProvider === "ollama"){
+      errDiv.textContent = "Local AI generation failed — loading built-in case.";
+      startOfflineCase();
+      return;
+    }
+    errDiv.textContent = "Could not generate case. Try again or play offline.";
+    return;
+  }
+
+  resetState();
+  launchGame(cd);
+}
+
+function startOfflineCase(){
+  resetState();
+  state.isOffline = true;
+  launchGame(JSON.parse(JSON.stringify(OFFLINE_CASE)));
+}
+
+/* Event Listeners */
+document.getElementById("new-case-btn").addEventListener("click", ()=>{
+  const key = document.getElementById("api-key-input").value.trim();
+  const ollamaReady = state.ollamaAvail && state.ollamaHasModel;
+  if(!key && !ollamaReady){
+    document.getElementById("start-error").textContent = "Enter a Gemini key or start Ollama with 'ollama pull " + OLLAMA_MODEL + "'";
+    return;
+  }
+  if(key) saveKey(key);
+  const theme = document.getElementById("theme-input").value.trim() || THEMES[Math.floor(Math.random()*THEMES.length)];
+  startAICase(theme);
+});
+
+document.getElementById("offline-btn").addEventListener("click", startOfflineCase);
+document.getElementById("offline-from-error-btn").addEventListener("click", startOfflineCase);
+
+// Theme Pills in Start Card
+document.querySelectorAll(".theme-pill").forEach(p => {
+  p.addEventListener("click", () => {
+    document.getElementById("theme-input").value = p.dataset.theme;
+  });
+});
+
+document.getElementById("dossier-close-btn").addEventListener("click", ()=>{
+  document.getElementById("dossier-modal").classList.add("hidden");
+  selectSuspect("s1");
+});
+
+document.getElementById("ask-btn").addEventListener("click", submitQuestion);
+document.getElementById("question-input").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); submitQuestion(); }
+});
+
+// Quick question chip clicks
+document.querySelectorAll(".qq-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const qInput = document.getElementById("question-input");
+    qInput.value = chip.textContent.replace(/^"|"$/g, "");
+    qInput.focus();
+  });
+});
+
+// Skip typewriter on dialogue text click
+document.getElementById("dialogue-text-box").addEventListener("click", ()=>{
+  state.twAbort = true;
+  stopMouthAnimation();
+});
+document.getElementById("dialogue-skip-hint").addEventListener("click", ()=>{
+  state.twAbort = true;
+  stopMouthAnimation();
+});
+
+// Accuse Modal triggers
+document.getElementById("accuse-trigger-btn").addEventListener("click", openAccuseModal);
+document.getElementById("accuse-cancel-btn").addEventListener("click", closeAccuseModal);
+document.getElementById("accuse-confirm-btn").addEventListener("click", confirmAccusation);
+
+// Retry on error
+document.getElementById("retry-btn").addEventListener("click", ()=>{
+  hideError();
+  submitQuestion();
+});
+
+// Sound Toggle
+document.getElementById("sound-toggle").addEventListener("click", ()=>{
+  FX.sound = !FX.sound;
+  document.getElementById("sound-toggle").textContent = FX.sound ? "🔊 Sound" : "🔇 Muted";
+  if(FX.sound) playPinSound();
+});
+
+// Play Again
+document.getElementById("play-again-btn").addEventListener("click", ()=>{
+  resetState();
+  flashTransition(()=>setScreen("start"));
+});
+
+/* Init */
+(function init(){
+  initFXCanvas();
+  try{
+    const k = localStorage.getItem("whodunit_key");
+    if(k) document.getElementById("api-key-input").value = k;
+  }catch{}
+  document.getElementById("footer-model").textContent = MODELS[0];
+  setScreen("start");
+  detectOllama();
+  window.addEventListener("unhandledrejection", e => { console.warn("Unhandled:", e.reason); e.preventDefault(); });
+})();
+</script>
+</body>
+</html>
